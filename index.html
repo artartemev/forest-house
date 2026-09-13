@@ -267,7 +267,7 @@ for(let i=0;i<8;i++){ const x2=SB-.3*i, x1=x2-.3, top=L/8*(i+1); boxAt(x1,x2,0,t
 box(.08,1.05,.08,RAIL,SB+.05,.52,ZK-.95); box(.08,.95,.08,RAIL,ST,L+.47,ZK-.95);
 { const len=Math.hypot(2.5,L); const r=box(len,.07,.1,RAIL,(SB+ST)/2+.02,L/2+.93,ZK-.95); r.rotation.z=Math.atan2(-L,2.5); }
 railZ(ZK-.95,ZK,ST-.05,L,.9,RAIL);
-{ const b=boxAt(ST-.08,ST-.02,L,L+1.1,ZK-1,ZK,new T.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})); b.castShadow=b.receiveShadow=false; } // невидимый барьер у перил
+{ const b=boxAt(ST-.42,ST-.36,L,L+1.1,ZK-1,ZK,new T.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})); b.castShadow=b.receiveShadow=false; } // невидимый барьер у перил
 
 // ---------- roof ----------
 const ang = Math.atan(0.5), half = D/2+.4, slopeLen = Math.hypot(half, half*.5), eaveY = H-.2, roofCy = (eaveY+RIDGE)/2;
