@@ -196,10 +196,10 @@ const inHouse=(x,z,px,pz)=>x>-3-px&&x<W+3+px&&z>-6-pz&&z<D+5+pz;
 const distSeg=(x,z,ax,az,bx,bz)=>{ const dx=bx-ax,dz=bz-az; const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz))); return Math.hypot(x-(ax+dx*t), z-(az+dz*t)); };
 const blocked=(x,z)=>distSeg(x,z,24,24,W/2,D/2)<7 || distSeg(x,z,W/2,D+15,W/2,D)<5 || Math.hypot(x-24,z-24)<10;
 // ближний пояс — деревья вплотную к дому, дальний — сплошная стена леса
-for(let i=0;i<70;i++){ let x,z; do { x=-24+rnd()*62; z=-24+rnd()*58; } while(inHouse(x,z,0,0)||blocked(x,z)); (rnd()<.22?palm:jungleTree)(x,z); }
+for(let i=0;i<70;i++){ let x,z; do { x=-24+rnd()*62; z=-24+rnd()*58; } while(inHouse(x,z,2,2)||blocked(x,z)); (rnd()<.22?palm:jungleTree)(x,z); }
 for(let i=0;i<90;i++){ let x,z; do { x=-48+rnd()*110; z=-48+rnd()*104; } while(inHouse(x,z,20,20)||blocked(x,z)); (rnd()<.15?palm:jungleTree)(x,z); }
-for(const [x,z] of [[-2,-4.5],[W+2.2,-4],[-2.2,D+3],[-1.5,3],[W+2,1.5],[6,-6]]) jungleTree(x,z);
-for(const [x,z] of [[W+1,-1],[-1.5,D+4],[1.5,D+5]]) palm(x,z);
+for(const [x,z] of [[-3,-5.5],[W+3,-5],[-3.2,D+3.5],[-3.5,4],[W+3.2,2],[6,-7]]) jungleTree(x,z);
+for(const [x,z] of [[W+2.2,-1],[-2.5,D+4.5],[1.5,D+5.5]]) palm(x,z);
 for(let i=0;i<110;i++){ let x,z; do { x=-30+rnd()*74; z=-30+rnd()*70; } while(inHouse(x,z,-1.5,-1.5)); undergrowth(x,z,.8+rnd()*.7); }
 for(let x=-.5;x<PX;x+=.55) blob(x, .5, D+3.4+(rnd()-.5)*.5, .4+rnd()*.25, .85);
 for(let x=PX+2.6;x<W+.5;x+=.6) blob(x, .45, D+.8+(rnd()-.5)*.6, .35+rnd()*.2, .85);
@@ -335,7 +335,6 @@ function place(name, x, z, y=L, rot=0, colors={}, s=2){ const p = loadModel(name
 const R = Math.PI/2;
 // гостевая (0..XG × 0..ZK, уровень 0)
 place('bedSingle', 1.4, ZK-1.2, 0, R, {carpet:0x2f3f66, carpetWhite:0xefe3cf});
-place('pillow', .5, ZK-1.2, .5, R, {carpet:0xd39a3c});
 place('cabinetBedDrawerTable', .5, .45, 0, 0); place('lampRoundTable', .5, .45, .52, 0);
 place('rugRound', 3.3, ZK-1.2, .01, 0, {carpet:0xd39a3c, carpetDarker:0xa8583f});
 place('pottedPlant', 4.5, .5, 0, 0);
@@ -355,7 +354,6 @@ place('bathroomSink', XB-.42, ZK+.5, L-.2, -R); place('bathroomMirror', XB-.12, 
 place('showerRound', XG+.62, ZK+.72, L, 0);
 // спальня (0..XG × ZK..D, уровень L)
 place('bedDouble', 1.3, ZK+2.1, L, R, {carpet:0xa8583f, carpetWhite:0xefe3cf});
-place('pillow', .9, ZK+1.3, L+.5, R, {carpet:0xd39a3c}); place('pillow', 1.7, ZK+1.3, L+.5, R, {carpet:0x2f3f66});
 place('cabinetBedDrawerTable', .45, ZK+.6, L, 0); place('lampRoundTable', .45, ZK+.6, L+.52, 0);
 place('cabinetBedDrawerTable', 2.3, ZK+.6, L, 0); place('plantSmall1', 2.3, ZK+.6, L+.52, 0);
 place('loungeChairRelax', 3.7, D-1.4, L, -R-.5, {carpet:0xd39a3c});
@@ -418,7 +416,7 @@ function collectSolids(){ solids = []; walkables = [ground];
 const ray = new T.Raycaster(), tmpV = new T.Vector3(), euler = new T.Euler(0,0,0,'YXZ');
 function groundAt(x, yFrom, z){ ray.set(tmpV.set(x, yFrom, z), new T.Vector3(0,-1,0)); ray.far = 30; const h = ray.intersectObjects(walkables, false); return h.length ? h[0].point.y : 0; }
 function blockedDir(px, pz, dx, dz){ const len = Math.hypot(dx,dz); if(len<1e-6) return false; const d = new T.Vector3(dx/len,0,dz/len);
-  for(const hy of [.35, .8, 1.25, 1.62]){ ray.set(tmpV.set(px - d.x*.25, walk.feetY+hy, pz - d.z*.25), d); ray.far = .7; if(ray.intersectObjects(solids, false).length) return true; } return false; }
+  for(const hy of [.5, .9, 1.25, 1.62]){ ray.set(tmpV.set(px - d.x*.25, walk.feetY+hy, pz - d.z*.25), d); ray.far = .7; if(ray.intersectObjects(solids, false).length) return true; } return false; }
 function startWalk(){ if(walk.on) return; if(!solids.length) collectSolids(); tw = null;
   const sx = PX+1.6, sz = D+4.6; walk.feetY = groundAt(sx, 3, sz); camera.position.set(sx, walk.feetY+EYE, sz);
   walk.yaw = Math.atan2(-(W/2-sx), -(D-sz)); walk.pitch = 0; walk.keys = {}; walk.spaces = [];
@@ -443,7 +441,7 @@ function stepWalk(now){ const dt = Math.min(.05, (now-lastT)/1000); lastT = now;
   if(!blockedDir(p.x, p.z, dx, 0)) p.x += dx;
   if(!blockedDir(p.x, p.z, 0, dz)) p.z += dz;
   const g = groundAt(p.x, walk.feetY + 1.0, p.z);
-  walk.feetY += (g - walk.feetY) * Math.min(1, dt*14); p.y = walk.feetY + EYE; }
+  walk.feetY += (g - walk.feetY) * Math.min(1, dt*24); p.y = walk.feetY + EYE; }
 const walkHud = document.getElementById('walkHud'), cross = document.getElementById('cross'), hudLock = document.getElementById('hudLock'), walkBtn = document.getElementById('walkBtn');
 walkBtn.onclick = ()=> walk.on ? leaveWalk() : startWalk();
 
