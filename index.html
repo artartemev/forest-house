@@ -42,7 +42,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:Manrope,system-ui
 <canvas id="c"></canvas>
 <div id="ui">
   <div class="ttl">Дом в лесу — 3D <button id="fold" aria-label="Свернуть панель">−</button></div>
-  <div class="sub">Реконструкция по фото и плану. Размеры оценочные (дом ≈ 12 × 8 м).</div>
+  <div class="sub">Реконструкция по фото и плану. Размеры оценочные (дом ≈ 14 × 9,5 м). Мебель — Kenney Furniture Kit (CC0).</div>
   <div id="views"></div>
   <div class="tog">
     <label><input type="checkbox" id="roof" checked> Крыша</label>
@@ -60,11 +60,19 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:Manrope,system-ui
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 const T = THREE;
 const L = 1.3;            // уровень гостиной/спальни
 const H = 3.6;            // высота стен до карниза
-const Rz = z => 5.6 - 0.5*Math.abs(z-4);   // высота крыши в точке z
+const W = 14, D = 9.5;    // габариты дома
+const ZK = 2.8, XG = 5.0; // глубина кухни/гостевой, ширина гостевой/спальни
+const XB = 7.8, ZB = 5.6; // санузел XG..XB × ZK..ZB
+const ST = 8.0, SB = 10.4, BX = 10.4;   // лестница: верх, низ; начало барной стойки
+const BD1 = 3.8, BD2 = 7.2;             // двери в санузел и спальню (z)
+const PX = 9.6;                          // ширина крыльца
+const RIDGE = H + .5*D/2;                // конёк
+const Rz = z => RIDGE - .5*Math.abs(z-D/2);   // высота крыши в точке z
 
 // ---------- scene ----------
 const canvas = document.getElementById('c');
@@ -157,9 +165,9 @@ function winZ(x,a,b,y0,y1,t=0.22){ const f=.06, w=b-a, h=y1-y0, cy=(y0+y1)/2, cz
   const g=box(.02,h-2*f,w-2*f,GLASS,x,cy,cz); g.castShadow=false; }
 const LEAF = solid(0x6b4a2e);
 function doorX(z,a,b,y0,h,t,ang){ const f=.06, w=b-a; box(f,h,t+.04,FRAME,a+f/2,y0+h/2,z); box(f,h,t+.04,FRAME,b-f/2,y0+h/2,z); box(w,f,t+.04,FRAME,(a+b)/2,y0+h-f/2,z);
-  const g=new T.Group(); g.position.set(a+f,y0,z); g.rotation.y=ang; scene.add(g); box(w-2*f,h-.05,.045,LEAF,(w-2*f)/2,h/2,0,g); cyl(.02,.02,METAL,w-2*f-.1,1.0,.05,g); }
+  const g=new T.Group(); g.position.set(a+f,y0,z); g.rotation.y=ang; scene.add(g); box(w-2*f,h-.05,.045,LEAF,(w-2*f)/2,h/2,0,g).userData.noCollide=true; cyl(.02,.02,METAL,w-2*f-.1,1.0,.05,g); }
 function doorZ(x,a,b,y0,h,t,ang){ const f=.06, w=b-a; box(t+.04,h,f,FRAME,x,y0+h/2,a+f/2); box(t+.04,h,f,FRAME,x,y0+h/2,b-f/2); box(t+.04,f,w,FRAME,x,y0+h-f/2,(a+b)/2);
-  const g=new T.Group(); g.position.set(x,y0,a+f); g.rotation.y=ang; scene.add(g); box(.045,h-.05,w-2*f,LEAF,0,h/2,(w-2*f)/2,g); cyl(.02,.02,METAL,.05,1.0,w-2*f-.1,g); }
+  const g=new T.Group(); g.position.set(x,y0,a+f); g.rotation.y=ang; scene.add(g); box(.045,h-.05,w-2*f,LEAF,0,h/2,(w-2*f)/2,g).userData.noCollide=true; cyl(.02,.02,METAL,.05,1.0,w-2*f-.1,g); }
 const dh = (a,b,y0) => [a,b,y0+.01,y0+2.1]; // проём двери (чуть выше низа контура, чтобы не ломать триангуляцию)
 function railX(x1,x2,z,y0,h=.9,m=POST){ box(x2-x1,.06,.08,m,(x1+x2)/2,y0+h,z); for(let x=x1;x<=x2+.001;x+=.3) box(.04,h,.04,m,x,y0+h/2,z); }
 function railZ(z1,z2,x,y0,h=.9,m=POST){ box(.08,.06,z2-z1,m,x,y0+h,(z1+z2)/2); for(let z=z1;z<=z2+.001;z+=.3) box(.04,h,.04,m,x,y0+h/2,z); }
@@ -183,181 +191,214 @@ function palm(x,z){ const h=4+rnd()*4, tilt=(rnd()-.5)*.35, dir=rnd()*Math.PI*2;
 // подлесок: кусты, банановые листья, папоротник
 function undergrowth(x,z,s=1){ const n=3+Math.floor(rnd()*3); for(let i=0;i<n;i++) blob(x+(rnd()-.5)*1.6*s, (.35+rnd()*.3)*s, z+(rnd()-.5)*1.6*s, (.35+rnd()*.45)*s, .8);
   if(rnd()<.4){ const m=gm(); for(let i=0;i<5;i++){ const a=rnd()*Math.PI*2, f=new T.Mesh(new T.SphereGeometry(1,7,5), m); f.scale.set(.25,.05,1.1); f.position.set(x+Math.sin(a)*.8, 1.2+rnd()*.5, z+Math.cos(a)*.8); f.rotation.set(-.9,a,0,'YXZ'); f.castShadow=true; vegG.add(f); } } }
-const inHouse=(x,z,px,pz)=>x>-3-px&&x<15+px&&z>-6-pz&&z<13+pz;
+const inHouse=(x,z,px,pz)=>x>-3-px&&x<W+3+px&&z>-6-pz&&z<D+5+pz;
 // просветы вдоль линий обзора «Общий вид» и «Фасад», чтобы кроны не закрывали дом
 const distSeg=(x,z,ax,az,bx,bz)=>{ const dx=bx-ax,dz=bz-az; const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz))); return Math.hypot(x-(ax+dx*t), z-(az+dz*t)); };
-const blocked=(x,z)=>distSeg(x,z,22,22,6,4)<7 || distSeg(x,z,6,21,6,6)<5 || Math.hypot(x-22,z-22)<10;
+const blocked=(x,z)=>distSeg(x,z,24,24,W/2,D/2)<7 || distSeg(x,z,W/2,D+15,W/2,D)<5 || Math.hypot(x-24,z-24)<10;
 // ближний пояс — деревья вплотную к дому, дальний — сплошная стена леса
 for(let i=0;i<70;i++){ let x,z; do { x=-24+rnd()*62; z=-24+rnd()*58; } while(inHouse(x,z,0,0)||blocked(x,z)); (rnd()<.22?palm:jungleTree)(x,z); }
 for(let i=0;i<90;i++){ let x,z; do { x=-48+rnd()*110; z=-48+rnd()*104; } while(inHouse(x,z,20,20)||blocked(x,z)); (rnd()<.15?palm:jungleTree)(x,z); }
-for(const [x,z] of [[-2,-4.5],[14.2,-4],[-2.2,10],[-1.5,3],[14,1.5],[6,-6]]) jungleTree(x,z);
-for(const [x,z] of [[13,-1],[-1.5,12],[1.5,13.5]]) palm(x,z);
+for(const [x,z] of [[-2,-4.5],[W+2.2,-4],[-2.2,D+3],[-1.5,3],[W+2,1.5],[6,-6]]) jungleTree(x,z);
+for(const [x,z] of [[W+1,-1],[-1.5,D+4],[1.5,D+5]]) palm(x,z);
 for(let i=0;i<110;i++){ let x,z; do { x=-30+rnd()*74; z=-30+rnd()*70; } while(inHouse(x,z,-1.5,-1.5)); undergrowth(x,z,.8+rnd()*.7); }
-for(let x=-.5;x<9.5;x+=.55) blob(x, .5, 11.4+(rnd()-.5)*.5, .4+rnd()*.25, .85);
-for(let x=9.5;x<12.5;x+=.6) blob(x, .45, 8.8+(rnd()-.5)*.6, .35+rnd()*.2, .85);
-for(let z=2.6;z<8;z+=.6) blob(-.7, .45, z, .35+rnd()*.2, .85);
-for(let z=-3;z<0;z+=.7) blob(12.9, .5, z, .4+rnd()*.2, .85);
+for(let x=-.5;x<PX;x+=.55) blob(x, .5, D+3.4+(rnd()-.5)*.5, .4+rnd()*.25, .85);
+for(let x=PX+2.6;x<W+.5;x+=.6) blob(x, .45, D+.8+(rnd()-.5)*.6, .35+rnd()*.2, .85);
+for(let z=ZK+.2;z<D;z+=.6) blob(-.7, .45, z, .35+rnd()*.2, .85);
+for(let z=-3;z<0;z+=.7) blob(W+.9, .5, z, .4+rnd()*.2, .85);
 
+// ---------- планировка (м) ----------
+// W×D — основной объём; ZK — глубина кухни/гостевой; XG — ширина гостевой/спальни; санузел XG..XB × ZK..ZB
 // ---------- floors ----------
-floorAt(4.1,12,0,2.4,0,.15,'terracotta');            // кухня
-floorAt(0,4.1,0,2.4,0,.15,'terracotta');             // гостевая
-floorAt(0,12,2.4,8.1,L,.28,'woodFloor');             // гостиная + спальня (приподнятая часть)
-floorAt(4.1,6.3,2.4,4.5,L+.015,.02,'whiteTile');     // санузел
-floorAt(-.2,12.2,-3.4,0,.03,.12,'stone');            // веранда
-floorAt(0,8.6,8.1,10.6,L,.15,'deck');                // крыльцо
-// опоры под приподнятой частью
-for(const x of [.3,3,6,9,11.7]) for(const z of [2.7,5.2,7.8]) cyl(.12,L-.28,CONCRETE,x,(L-.28)/2,z);
-for(const x of [.3,4.4,8.3]) for(const z of [8.4,10.3]) box(.16,L-.15,.16,POST,x,(L-.15)/2,z);
+floorAt(XG,W,0,ZK,0,.15,'terracotta');              // кухня
+floorAt(0,XG,0,ZK,0,.15,'terracotta');              // гостевая
+floorAt(0,W,ZK,D+.1,L,.28,'woodFloor');             // гостиная + спальня (приподнятая часть)
+floorAt(XG,XB,ZK,ZB,L+.015,.02,'whiteTile');        // санузел
+floorAt(-.2,W+.2,-3.4,0,.03,.12,'stone');           // веранда
+floorAt(0,PX,D+.1,D+2.6,L,.15,'deck');              // крыльцо
+for(const x of [.3,3.5,7,10.5,W-.3]) for(const z of [ZK+.3,D/2+.5,D-.3]) cyl(.12,L-.28,CONCRETE,x,(L-.28)/2,z);
+for(const x of [.3,PX/2,PX-.3]) for(const z of [D+.4,D+2.3]) box(.16,L-.15,.16,POST,x,(L-.15)/2,z);
 
 // ---------- exterior walls ----------
 // север (z=0): внутри белый кирпич, снаружи красный
-wallX(0, [[0,0],[12,0],[12,H],[0,H]], [[1.3,2.4,1.3,2.4],[5.0,10.2,1.15,2.4],dh(10.8,11.8,0)], .22, 'whiteBrick', 'redBrick');
-winX(0,1.3,2.4,1.3,2.4); winX(0,5.0,10.2,1.15,2.4); doorX(0,10.8,11.8,0,2.1,.22,-1.25);
-// юг (z=8)
-wallX(8, [[0,L],[4.1,L],[4.1,H],[0,H]], [[1.2,2.4,L+1,L+2]], .22, 'darkWood', 'whiteBrick'); winX(8,1.2,2.4,L+1,L+2);
-wallX(8, [[4.1,L],[12,L],[12,H],[4.1,H]], [dh(4.4,5.4,L),[8.6,11,L+1,L+2]], .22, 'darkWood', 'darkWood'); winX(8,8.6,11,L+1,L+2); doorX(8,4.4,5.4,L,2.1,.22,-1.2);
-// запад (x=0): гостевая от земли, спальня от +1.3; внутри кирпич до карниза, выше — дерево
-wallZ(0, [[0,0],[2.4,0],[2.4,L],[8,L],[8,H],[0,H]], [[4.4,5.6,L+1,L+2]], .22, 'whiteBrick', 'darkWood'); winZ(0,4.4,5.6,L+1,L+2);
-wallZ(0, [[0,H],[8,H],[4,5.6]], [], .22, 'darkWood', 'darkWood');
-// восток (x=12)
-wallZ(12, [[0,0],[2.4,0],[2.4,H],[0,H]], [], .22, 'darkWood', 'whiteBrick');
-wallZ(12, [[2.4,L],[8,L],[8,H],[2.4,H]], [[3.4,7.4,L+1,L+2]], .22, 'darkWood', 'darkWood'); winZ(12,3.4,7.4,L+1,L+2);
-wallZ(12, [[0,H],[8,H],[4,5.6]], [], .22, 'darkWood', 'darkWood');
+wallX(0, [[0,0],[W,0],[W,H],[0,H]], [[1.5,3.0,1.3,2.4],[6.0,12.2,1.15,2.4],dh(12.8,13.8,0)], .22, 'whiteBrick', 'redBrick');
+winX(0,1.5,3.0,1.3,2.4); winX(0,6.0,12.2,1.15,2.4); doorX(0,12.8,13.8,0,2.1,.22,1.45);
+// юг (z=D)
+wallX(D, [[0,L],[XG,L],[XG,H],[0,H]], [[1.4,2.8,L+1,L+2]], .22, 'darkWood', 'whiteBrick'); winX(D,1.4,2.8,L+1,L+2);
+wallX(D, [[XG,L],[W,L],[W,H],[XG,H]], [dh(5.6,6.6,L),[10.0,12.6,L+1,L+2]], .22, 'darkWood', 'darkWood'); winX(D,10.0,12.6,L+1,L+2); doorX(D,5.6,6.6,L,2.1,.22,-1.45);
+// запад (x=0)
+wallZ(0, [[0,0],[ZK,0],[ZK,L],[D,L],[D,H],[0,H]], [[.8,1.8,1.3,2.4],[5.0,6.4,L+1,L+2]], .22, 'whiteBrick', 'darkWood'); winZ(0,.8,1.8,1.3,2.4); winZ(0,5.0,6.4,L+1,L+2);
+wallZ(0, [[0,H],[D,H],[D/2,RIDGE]], [], .22, 'darkWood', 'darkWood');
+// восток (x=W)
+wallZ(W, [[0,0],[ZK,0],[ZK,H],[0,H]], [], .22, 'darkWood', 'whiteBrick');
+wallZ(W, [[ZK,L],[D,L],[D,H],[ZK,H]], [[4.2,8.6,L+1,L+2]], .22, 'darkWood', 'darkWood'); winZ(W,4.2,8.6,L+1,L+2);
+wallZ(W, [[0,H],[D,H],[D/2,RIDGE]], [], .22, 'darkWood', 'darkWood');
 
 // ---------- interior walls ----------
-// кухня / гостевая (x=4.1)
-wallZ(4.1, [[0,0],[2.4,0],[2.4,Rz(2.4)],[0,H]], [dh(.8,1.7,0)], .16, 'whiteBrick', 'whiteBrick'); doorZ(4.1,.8,1.7,0,2.1,.16,1.2);
-// спальня / гостевая (z=2.4)
-wallX(2.4, [[0,0],[4.1,0],[4.1,L],[0,L]], [], .22, 'whiteBrick', 'whiteBrick');
-wallX(2.4, [[0,L],[4.1,L],[4.1,Rz(2.4)],[0,Rz(2.4)]], [], .16, 'whiteBrick', 'whiteBrick');
-// граница кухня / гостиная (z=2.4)
-wallX(2.4, [[4.1,0],[12,0],[12,L],[4.1,L]], [], .22, 'whiteBrick', 'whiteBrick');                  // подпорная под гостиной
-wallX(2.4, [[4.1,L],[6.4,L],[6.4,Rz(2.4)],[4.1,Rz(2.4)]], [], .16, 'darkWood', 'whiteBrick');       // глухая часть
-wallX(2.4, [[7.6,L],[8.8,L],[8.8,L+1],[7.6,L+1]], [], .12, 'darkWood', 'darkWood');                // полустенка у лестницы
-wallX(2.4, [[8.8,L],[12,L],[12,L+1],[8.8,L+1]], [], .12, 'darkWood', 'darkWood');                  // барная стойка
-boxAt(8.8,12,L+1,L+1.05,2.1,2.75,CREAM); boxAt(7.6,8.8,L+1,L+1.04,2.3,2.5,POST);
-box(.18,Rz(2.5)-L,.18,POST,8.8,(Rz(2.5)+L)/2,2.5);
-// перегородка в гостиной (x=8.8)
-wallZ(8.8, [[2.9,L],[5.6,L],[5.6,L+1],[2.9,L+1]], [], .12, 'darkWood', 'darkWood'); boxAt(8.7,8.9,L+1,L+1.04,2.9,5.6,POST);
-box(.18,Rz(5.6)-L,.18,POST,8.8,(Rz(5.6)+L)/2,5.6);
-// спальня / гостиная (x=4.1): низ — кирпич со стороны спальни, дерево со стороны гостиной; верх — дерево
-wallZ(4.1, [[2.4,L],[8,L],[8,H],[2.4,H]], [dh(3.1,4.0,L),dh(6.0,6.9,L)], .16, 'darkWood', 'whiteBrick');
-wallZ(4.1, [[2.4,H],[8,H],[4,5.6],[2.4,Rz(2.4)]], [], .16, 'darkWood', 'darkWood');
-doorZ(4.1,3.1,4.0,L,2.1,.16,1.3); doorZ(4.1,6.0,6.9,L,2.1,.16,-1.3);
-// санузел
-wallZ(4.19, [[2.4,L],[4.5,L],[4.5,L+2.25],[2.4,L+2.25]], [dh(3.1,4.0,L)], .02, 'whiteTile', 'whiteTile'); // облицовка изнутри
-wallX(2.5, [[4.1,L],[6.3,L],[6.3,L+2.25],[4.1,L+2.25]], [], .02, 'whiteTile', 'whiteTile'); // плитка на стене кухни
-wallZ(6.3, [[2.4,L],[4.5,L],[4.5,L+2.25],[2.4,L+2.25]], [dh(3.1,4.0,L),[4.1,4.4,L+1.4,L+1.9]], .12, 'whiteBrick', 'whiteTile');
-doorZ(6.3,3.1,4.0,L,2.1,.12,1.3); const gb = boxAt(6.25,6.35,L+1.4,L+1.9,4.1,4.4,new T.MeshPhysicalMaterial({color:0xe8f0f2,transparent:true,opacity:.6,roughness:.4})); gb.castShadow=false;
-wallX(4.5, [[4.1,L],[6.3,L],[6.3,L+2.25],[4.1,L+2.25]], [], .12, 'whiteBrick', 'whiteTile');
-boxAt(4.1,6.3,L+2.25,L+2.33,2.4,4.5,solid(0xe4e0d8));
+// кухня / гостевая (x=XG)
+wallZ(XG, [[0,0],[ZK,0],[ZK,Rz(ZK)],[0,H]], [dh(.9,1.8,0)], .16, 'whiteBrick', 'whiteBrick'); doorZ(XG,.9,1.8,0,2.1,.16,1.45);
+// спальня / гостевая (z=ZK)
+wallX(ZK, [[0,0],[XG,0],[XG,L],[0,L]], [], .22, 'whiteBrick', 'whiteBrick');
+wallX(ZK, [[0,L],[XG,L],[XG,Rz(ZK)],[0,Rz(ZK)]], [], .16, 'whiteBrick', 'whiteBrick');
+// граница кухня / гостиная (z=ZK)
+wallX(ZK, [[XG,0],[W,0],[W,L],[XG,L]], [], .22, 'whiteBrick', 'whiteBrick');                        // подпорная под гостиной
+wallX(ZK, [[XG,L],[ST,L],[ST,Rz(ZK)],[XG,Rz(ZK)]], [], .16, 'darkWood', 'whiteBrick');             // глухая часть
+wallX(ZK, [[ST+1.2,L],[BX,L],[BX,L+1],[ST+1.2,L+1]], [], .12, 'darkWood', 'darkWood');    // полустенка у лестницы
+wallX(ZK, [[BX,L],[W,L],[W,L+1],[BX,L+1]], [], .12, 'darkWood', 'darkWood');                        // барная стойка
+boxAt(BX,W,L+1,L+1.05,ZK-.3,ZK+.35,CREAM); boxAt(ST+1.2,BX,L+1,L+1.04,ZK-.1,ZK+.1,POST);
+box(.18,Rz(ZK+.1)-L,.18,POST,BX,(Rz(ZK+.1)+L)/2,ZK+.1);
+// перегородка в гостиной (x=BX)
+wallZ(BX, [[ZK+.5,L],[ZK+3.2,L],[ZK+3.2,L+1],[ZK+.5,L+1]], [], .12, 'darkWood', 'darkWood'); boxAt(BX-.1,BX+.1,L+1,L+1.04,ZK+.5,ZK+3.2,POST);
+box(.18,Rz(ZK+3.2)-L,.18,POST,BX,(Rz(ZK+3.2)+L)/2,ZK+3.2);
+// спальня / гостиная (x=XG)
+wallZ(XG, [[ZK,L],[D,L],[D,H],[ZK,H]], [dh(BD1,BD1+.9,L),dh(BD2,BD2+.9,L)], .16, 'darkWood', 'whiteBrick');
+wallZ(XG, [[ZK,H],[D,H],[D/2,RIDGE],[ZK,Rz(ZK)]], [], .16, 'darkWood', 'darkWood');
+doorZ(XG,BD1,BD1+.9,L,2.1,.16,1.45); doorZ(XG,BD2,BD2+.9,L,2.1,.16,-1.45);
+// санузел (XG..XB × ZK..ZB): унитаз, раковина, душ
+wallZ(XG+.09, [[ZK,L],[ZB,L],[ZB,L+2.3],[ZK,L+2.3]], [dh(BD1,BD1+.9,L)], .02, 'whiteTile', 'whiteTile');   // плитка на стене спальни
+wallX(ZK+.1, [[XG,L],[XB,L],[XB,L+2.3],[XG,L+2.3]], [], .02, 'whiteTile', 'whiteTile');                       // плитка на стене кухни
+wallZ(XB, [[ZK,L],[ZB,L],[ZB,L+2.3],[ZK,L+2.3]], [dh(BD1,BD1+.9,L),[ZB-.6,ZB-.25,L+1.4,L+1.9]], .12, 'whiteBrick', 'whiteTile');
+doorZ(XB,BD1,BD1+.9,L,2.1,.12,1.45); { const gb = boxAt(XB-.05,XB+.05,L+1.4,L+1.9,ZB-.6,ZB-.25,new T.MeshPhysicalMaterial({color:0xe8f0f2,transparent:true,opacity:.6,roughness:.4})); gb.castShadow=false; }
+wallX(ZB, [[XG,L],[XB,L],[XB,L+2.3],[XG,L+2.3]], [], .12, 'whiteBrick', 'whiteTile');
+boxAt(XG,XB,L+2.3,L+2.38,ZK,ZB,solid(0xe4e0d8));
 
 // ---------- stairs ----------
 const STEP = mat('terracotta',.3,1);
-for(let i=0;i<8;i++){ const x2=8.8-.3*i, x1=x2-.3, top=L/8*(i+1); boxAt(x1,x2,0,top,1.4,2.4,STEP); cyl(.035,.9,RAIL,x1+.15,top+.45,1.45); }
-box(.08,1.05,.08,RAIL,8.85,.52,1.45); box(.08,.95,.08,RAIL,6.4,L+.47,1.45);
-{ const len=Math.hypot(2.5,L); const r=box(len,.07,.1,RAIL,7.62,L/2+.93,1.45); r.rotation.z=Math.atan2(-L,2.5); }
-railZ(1.45,2.4,6.35,L,.9,RAIL);
+for(let i=0;i<8;i++){ const x2=SB-.3*i, x1=x2-.3, top=L/8*(i+1); boxAt(x1,x2,0,top,ZK-1,ZK,STEP); cyl(.035,.9,RAIL,x1+.15,top+.45,ZK-.95); }
+box(.08,1.05,.08,RAIL,SB+.05,.52,ZK-.95); box(.08,.95,.08,RAIL,ST,L+.47,ZK-.95);
+{ const len=Math.hypot(2.5,L); const r=box(len,.07,.1,RAIL,(SB+ST)/2+.02,L/2+.93,ZK-.95); r.rotation.z=Math.atan2(-L,2.5); }
+railZ(ZK-.95,ZK,ST-.05,L,.9,RAIL);
 
 // ---------- roof ----------
-const ang = Math.atan(0.5), slopeLen = Math.hypot(4.4,2.2);
+const ang = Math.atan(0.5), half = D/2+.4, slopeLen = Math.hypot(half, half*.5), eaveY = H-.2, roofCy = (eaveY+RIDGE)/2;
 function roofPanel(w, len, cx, cy, cz, rot, parent){ const side=solid(0x6b6b66); const m=[side,side,mat('corrugated',w,len),mat('woven',w,len),side,side]; const p=box(w,.1,len,m,cx,cy,cz,parent); p.rotation.x=rot; return p; }
-roofPanel(12.8, slopeLen, 6, 4.5, 1.8, -ang, roofG);
-roofPanel(12.8, slopeLen, 6, 4.5, 6.2, ang, roofG);
-box(12.9,.12,.32,solid(0x55554f),6,5.63,4,roofG);
-for(let x=.6;x<12;x+=1.15){ for(const s of [1,-1]){ const r=box(.1,.16,4.6,POST,x,4.36,4-s*2.15,roofG); r.rotation.x=-s*ang; } }
-box(12.4,.16,.16,POST,6,5.42,4,roofG);
+roofPanel(W+.8, slopeLen, W/2, roofCy, D/2-half/2, -ang, roofG);
+roofPanel(W+.8, slopeLen, W/2, roofCy, D/2+half/2, ang, roofG);
+box(W+.9,.12,.32,solid(0x55554f),W/2,RIDGE+.03,D/2,roofG);
+for(let x=.6;x<W;x+=1.15){ for(const s of [1,-1]){ const r=box(.1,.16,slopeLen-.3,POST,x,roofCy-.14,D/2-s*half/2,roofG); r.rotation.x=-s*ang; } }
+box(W+.4,.16,.16,POST,W/2,RIDGE-.18,D/2,roofG);
 // навес веранды
-{ const a=Math.atan(.65/3.1), len=Math.hypot(3.1,.65); roofPanel(12.6,len,6,3.07,-1.95,-a,roofG); for(let x=.4;x<12;x+=1.5){ const r=box(.08,.14,len-.1,POST,x,2.95,-1.95,roofG); r.rotation.x=-a; } }
-for(const x of [-.1,4,8,12.1]) box(.14,2.75,.14,POST,x,1.375,-3.3);
+{ const a=Math.atan(.65/3.1), len=Math.hypot(3.1,.65); roofPanel(W+.6,len,W/2,eaveY-.33,-1.95,-a,roofG); for(let x=.4;x<W;x+=1.5){ const r=box(.08,.14,len-.1,POST,x,eaveY-.45,-1.95,roofG); r.rotation.x=-a; } }
+for(const x of [-.1,W/3,2*W/3,W+.1]) box(.14,2.75,.14,POST,x,1.375,-3.3);
 // навес крыльца
-{ const a=Math.atan(.25/2.5), len=Math.hypot(2.5,.25); roofPanel(9.2,len,4.3,3.22,9.65,a,roofG); }
-for(const x of [.2,4.4,8.5]) box(.14,3.1-L,.14,POST,x,(3.1+L)/2,10.55);
+{ const a=Math.atan(.25/2.5), len=Math.hypot(2.5,.25); roofPanel(PX+.6,len,PX/2,eaveY-.18,D+.4+1.25,a,roofG); }
+for(const x of [.2,PX/2,PX-.1]) box(.14,3.1-L,.14,POST,x,(3.1+L)/2,D+2.55);
 
 // ---------- veranda & porch ----------
-wallX(-3.3, [[-.2,0],[12.2,0],[12.2,1],[-.2,1]], [], .2, 'redBrick', 'redBrick');
+wallX(-3.3, [[-.2,0],[W+.2,0],[W+.2,1],[-.2,1]], [], .2, 'redBrick', 'redBrick');
 wallZ(-.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
-wallZ(12.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
-railX(0,8.55,10.55,L); railZ(8.15,10.55,.05,L); railZ(8.15,9.3,8.55,L);
-for(let i=0;i<8;i++){ const x1=8.6+.3*i, top=L-L/8*(i+1); boxAt(x1,x1+.3,0,top+L/8,9.4,10.4,mat('deck',.3,1)); }
-railZ(9.4,10.4,8.6,L,.9);
+wallZ(W+.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
+railX(0,PX-.05,D+2.55,L); railZ(D+.15,D+2.55,.05,L); railZ(D+.15,D+1.3,PX-.05,L);
+for(let i=0;i<8;i++){ const x1=PX+.3*i, top=L-L/8*(i+1); boxAt(x1,x1+.3,0,top+L/8,D+1.4,D+2.4,mat('deck',.3,1)); }
+railZ(D+1.4,D+2.4,PX,L,.9);
 
-// ---------- furniture ----------
+// ---------- furniture (процедурная часть) ----------
 const F = furnG, DARK = solid(0x3f2a1b);
-// кухня
-boxAt(5.0,10.4,0,.82,.15,.75,mat('darkWood',5.4,.82),F); boxAt(4.95,10.45,.82,.87,.12,.8,CREAM,F);
-boxAt(5.4,6.3,.87,.9,.25,.65,METAL,F); cyl(.015,.3,METAL,5.85,1.02,.2,F); cyl(.015,.3,METAL,6.1,1.02,.2,F);
-boxAt(11.2,11.9,0,1.65,1.0,1.7,solid(0x3a3d40,{metalness:.4,roughness:.5}),F);
-{ const cordTop=Rz(1.2)-.15; cyl(.01,cordTop-2.85,solid(0x222),8,(cordTop+2.85)/2,1.2,F); cyl(.34,.35,solid(0xd9dbd8,{metalness:.7,roughness:.3}),8,2.67,1.2,F,.06); }
-boxAt(6.4,7.2,0,.75,.15,.75,DARK,F); // тумба у окна
-// гостевая
-boxAt(.3,1.3,0,.3,.3,2.3,DARK,F); boxAt(.33,1.27,.3,.5,.33,2.27,WHITE,F); boxAt(2.0,2.8,0,.74,.2,.8,DARK,F);
-// гостиная
 const RATTAN = mat('rattan',1,1), OCHRE = solid(0xd39a3c,{roughness:1}), TERRA = solid(0xa8583f,{roughness:1}), INDIGO = solid(0x2f3f66,{roughness:1}), LINEN = solid(0xe9dfc9,{roughness:1});
-// низкая тахта с подушками у восточной стены
-boxAt(10.9,11.9,L,L+.3,4.6,6.9,RATTAN,F); boxAt(10.95,11.85,L+.3,L+.48,4.65,6.85,LINEN,F);
-boxAt(11.45,11.85,L+.48,L+.9,4.7,5.3,OCHRE,F); boxAt(11.45,11.85,L+.48,L+.95,5.4,6.1,INDIGO,F); boxAt(11.45,11.85,L+.48,L+.85,6.2,6.8,TERRA,F);
-// пуфы из ротанга и напольные подушки
-cyl(.3,.4,RATTAN,9.2,L+.2,7.0,F); cyl(.28,.38,RATTAN,8.3,L+.19,6.4,F);
-boxAt(9.9,10.5,L,L+.14,7.0,7.6,TERRA,F); boxAt(10.6,11.2,L,L+.14,7.1,7.7,INDIGO,F);
-// килим под столиком
-boxAt(9.0,11.0,L,L+.02,4.9,6.5,mat('kilim',2,1.6),F);
-// подвесное кашпо у столба
-cyl(.006,1.2,solid(0xd8c7a6),8.8,L+2.9,5.2,F); cyl(.14,.16,TERRA,8.8,L+2.25,5.2,F,.11);
-{ const pl=new T.Mesh(new T.SphereGeometry(.24,10,8), solid(0x4a873a,{roughness:1})); pl.position.set(8.8,L+2.34,5.2); pl.scale.y=.6; pl.castShadow=true; F.add(pl); }
-boxAt(9.5,10.6,L+.38,L+.44,5.2,6.2,DARK,F); for(const [x,z] of [[9.55,5.25],[10.55,5.25],[9.55,6.15],[10.55,6.15]]) boxAt(x-.05,x+.05,L,L+.38,z-.05,z+.05,DARK,F);
+// кухня: подвес и стол у окна
+{ const cordTop=Rz(1.4)-.15; cyl(.01,cordTop-2.85,solid(0x222),9,(cordTop+2.85)/2,1.4,F); cyl(.34,.35,solid(0xd9dbd8,{metalness:.7,roughness:.3}),9,2.67,1.4,F,.06); }
+// гостиная: тахта, пуфы, подушки, килим, кашпо
+boxAt(W-1.1,W-.1,L,L+.3,ZK+2.2,ZK+4.6,RATTAN,F); boxAt(W-1.05,W-.15,L+.3,L+.48,ZK+2.25,ZK+4.55,LINEN,F);
+boxAt(W-.55,W-.15,L+.48,L+.9,ZK+2.3,ZK+2.9,OCHRE,F); boxAt(W-.55,W-.15,L+.48,L+.95,ZK+3.0,ZK+3.7,INDIGO,F); boxAt(W-.55,W-.15,L+.48,L+.85,ZK+3.8,ZK+4.4,TERRA,F);
+cyl(.3,.4,RATTAN,BX+.6,L+.2,D-1.2,F); cyl(.28,.38,RATTAN,BX-.5,L+.19,D-2.2,F);
+boxAt(BX+1.2,BX+1.8,L,L+.14,D-1.1,D-.5,TERRA,F); boxAt(BX+2.0,BX+2.6,L,L+.14,D-1.0,D-.4,INDIGO,F);
+boxAt(BX+.4,BX+2.6,L,L+.02,ZK+2.3,ZK+4.5,mat('kilim',2.2,2.2),F);
+boxAt(BX+.9,BX+2.1,L+.38,L+.44,ZK+2.8,ZK+4.0,DARK,F); for(const [x,z] of [[BX+.95,ZK+2.85],[BX+2.05,ZK+2.85],[BX+.95,ZK+3.95],[BX+2.05,ZK+3.95]]) boxAt(x-.05,x+.05,L,L+.38,z-.05,z+.05,DARK,F);
+cyl(.006,1.2,solid(0xd8c7a6),BX,L+2.9,ZK+2.0,F); cyl(.14,.16,TERRA,BX,L+2.25,ZK+2.0,F,.11);
+{ const pl=new T.Mesh(new T.SphereGeometry(.24,10,8), solid(0x4a873a,{roughness:1})); pl.position.set(BX,L+2.34,ZK+2.0); pl.scale.y=.6; pl.castShadow=true; F.add(pl); }
+boxAt(ST+.1,ST+1.1,L,L+.02,ZK+.2,ZK+.9,solid(0xd9d2c6),F);
 // консоль с проигрывателем у южной стены
 const player = new T.Group(); player.name='player'; F.add(player);
-boxAt(6.0,7.3,L,L+.62,7.45,7.9,RATTAN,player); boxAt(5.97,7.33,L+.62,L+.66,7.42,7.93,DARK,player);
-boxAt(6.35,6.95,L+.66,L+.72,7.5,7.88,solid(0x2a2320,{roughness:.5}),player);
-const platter = cyl(.16,.02,solid(0x111111,{roughness:.35}),6.6,L+.73,7.69,player); cyl(.05,.022,OCHRE,6.6,L+.732,7.69,player);
-const arm = box(.02,.015,.22,METAL,6.85,L+.75,7.62,player); arm.rotation.y=-.5; cyl(.03,.06,METAL,6.9,L+.75,7.55,player);
-boxAt(5.55,5.85,L+.05,L+.5,7.55,7.85,DARK,player); boxAt(7.45,7.75,L+.05,L+.5,7.55,7.85,DARK,player); // колонки
-for(let i=0;i<7;i++){ const r=boxAt(7.0+i*.035,7.02+i*.035,L+.66,L+.97,7.55,7.86,i%2?INDIGO:OCHRE,player); r.rotation.z=.12; }
-boxAt(4.5,5.6,L+.1,L+.85,4.58,5.05,solid(0x6a4527),F); for(const x of [4.55,5.55]) for(const z of [4.63,5.0]) boxAt(x-.03,x+.03,L,L+.1,z-.03,z+.03,DARK,F);
-boxAt(6.5,7.5,L,L+.02,2.55,3.3,solid(0xd9d2c6),F);
-// спальня
-// кровать: рама из тёмного дерева, изголовье из ротанга, бельё
-boxAt(.3,1.9,L+.12,L+.38,4.4,6.5,solid(0x4c3120),F); for(const [x,z] of [[.36,4.46],[1.84,4.46],[.36,6.44],[1.84,6.44]]) boxAt(x-.04,x+.04,L,L+.12,z-.04,z+.04,DARK,F);
-boxAt(.3,1.9,L+.38,L+1.15,4.4,4.5,RATTAN,F);
-boxAt(.35,1.85,L+.38,L+.62,4.52,6.45,LINEN,F);
-boxAt(.35,1.85,L+.62,L+.7,5.25,6.48,TERRA,F); boxAt(.35,1.85,L+.7,L+.72,5.25,5.6,solid(0xe0b04d),F);
-boxAt(.45,1.05,L+.62,L+.78,4.58,5.05,WHITE,F); boxAt(1.15,1.75,L+.62,L+.78,4.58,5.05,WHITE,F);
-cyl(.22,.45,RATTAN,2.25,L+.225,4.65,F); cyl(.06,.28,TERRA,2.25,L+.6,4.65,F,.04);
-boxAt(.6,2.6,L,L+.02,5.2,7.2,mat('kilim',2,2),F);
-boxAt(.12,.38,3.55,3.85,4.6,5.5,WHITE,F);
-boxAt(.13,.17,L+.9,L+2.15,3.9,4.38,solid(0xf3efe6),F); boxAt(.13,.17,L+.9,L+2.15,5.62,6.1,solid(0xf3efe6),F);
-// санузел
-boxAt(4.3,4.75,L,L+.4,4.0,4.4,WHITE,F); boxAt(4.3,4.5,L+.4,L+.8,4.05,4.35,WHITE,F); boxAt(5.7,6.2,L+.8,L+.95,2.6,3.05,WHITE,F);
-// веранда
+const PC = 7.9; // центр консоли по x
+boxAt(PC-.65,PC+.65,L,L+.62,D-.55,D-.1,RATTAN,player); boxAt(PC-.68,PC+.68,L+.62,L+.66,D-.58,D-.07,DARK,player);
+boxAt(PC-.3,PC+.3,L+.66,L+.72,D-.5,D-.12,solid(0x2a2320,{roughness:.5}),player);
+const platter = cyl(.16,.02,solid(0x111111,{roughness:.35}),PC-.05,L+.73,D-.31,player); cyl(.05,.022,OCHRE,PC-.05,L+.732,D-.31,player);
+const arm = box(.02,.015,.22,METAL,PC+.2,L+.75,D-.38,player); arm.rotation.y=-.5; cyl(.03,.06,METAL,PC+.25,L+.75,D-.45,player);
+boxAt(PC-1.1,PC-.8,L+.05,L+.5,D-.45,D-.15,DARK,player); boxAt(PC+.8,PC+1.1,L+.05,L+.5,D-.45,D-.15,DARK,player);
+for(let i=0;i<7;i++){ const r=boxAt(PC+.35+i*.035,PC+.37+i*.035,L+.66,L+.97,D-.45,D-.14,i%2?INDIGO:OCHRE,player); r.rotation.z=.12; }
+const pPos = new T.Vector3(PC, L+.7, D-.3);
+// спальня: килим
+boxAt(.8,3.6,L,L+.02,ZK+2.4,ZK+5.2,mat('kilim',2.8,2.8),F);
+// веранда: уличная кухня
 boxAt(.5,2.5,0,.8,-.95,-.35,METAL,F); cyl(.15,.05,solid(0x333),0.9,.83,-.65,F); cyl(.15,.6,solid(0x6fb7c9),.6,.3,-1.4,F);
-{ const t=box(.9,.05,.9,CREAM,8,.76,-1.6,F); cyl(.04,.72,DARK,8,.38,-1.6,F); }
+
+// ---------- 3D-модели (Kenney Furniture Kit, CC0) ----------
+const gltf = new T.GLTFLoader(), gcache = {};
+const BOHO = {wood:0xa66b3c, woodDark:0x6b4326, carpet:0xb9512f, carpetDarker:0x7a3b2a, carpetWhite:0xefe3cf, metal:0xb8a98e, metalDark:0x4a3f36, metalMedium:0x6b5c4d, metalLight:0xf2f0ea, plant:0x4a873a, lamp:0xffe4a8, glass:0xd7e6e6, _defaultMat:0xf4f3ef};
+function loadModel(name){ return gcache[name] || (gcache[name] = new Promise((res, rej)=> gltf.load('models/'+name+'.glb', g=>res(g.scene), undefined, rej))); }
+const pending = [];
+// place: имя модели, центр по x/z, уровень пола, поворот (рад), переопределение цветов по имени материала, масштаб
+function place(name, x, z, y=L, rot=0, colors={}, s=2){ const p = loadModel(name).then(src=>{
+    const o = src.clone(true); o.traverse(m=>{ if(!m.isMesh) return; m.material = m.material.clone(); const c = colors[m.material.name] ?? BOHO[m.material.name]; if(c!==undefined) m.material.color.setHex(c); m.material.roughness = .9; m.castShadow = m.receiveShadow = true; });
+    o.scale.setScalar(s); o.rotation.y = rot; o.updateMatrixWorld(true);
+    const b = new T.Box3().setFromObject(o); o.position.set(x-(b.min.x+b.max.x)/2, y-b.min.y, z-(b.min.z+b.max.z)/2); F.add(o); return o; }).catch(()=>null);
+  pending.push(p); return p; }
+const R = Math.PI/2;
+// гостевая (0..XG × 0..ZK, уровень 0)
+place('bedSingle', 1.4, 1.7, 0, R, {carpet:0x2f3f66, carpetWhite:0xefe3cf});
+place('pillow', .5, 1.7, .5, R, {carpet:0xd39a3c});
+place('cabinetBedDrawerTable', 2.3, .45, 0, 0); place('lampRoundTable', 2.3, .45, .52, 0);
+place('desk', 3.9, .6, 0, 0); place('chairCushion', 3.9, 1.3, 0, Math.PI, {carpet:0xa8583f}); place('books', 4.3, .6, .76, .3);
+place('rugRound', 3.1, 2.0, .01, 0, {carpet:0xd39a3c, carpetDarker:0xa8583f});
+place('pottedPlant', 4.5, 2.3, 0, 0); place('coatRackStanding', .4, 2.4, 0, 0);
+// кухня (XG..W × 0..ZK, уровень 0): гарнитур вдоль окна
+for(let i=0;i<7;i++) place(i===1?'kitchenSink':i===4?'kitchenStove':'kitchenCabinet', 6.45+i*.86, .45, 0, 0);
+place('kitchenFridge', W-.4, ZK-.7, 0, -R); place('kitchenCabinetUpper', W-.4, ZK-1.6, 1.5, -R);
+place('radio', BX+2.2, ZK+.05, L+1.05, 0); place('plantSmall1', BX+.6, ZK+.05, L+1.05, 0); place('plantSmall3', W-.4, ZK+.05, L+1.05, 0);
+for(const x of [BX+.9, BX+1.9, BX+2.9]) place('stoolBar', x, ZK+.7, L, 0, {carpet:0xa8583f});
+place('ceilingFan', W/2+1, 0, Rz(D/2)-.55, 0);
+// гостиная (XG..W × ZK..D, уровень L)
+place('loungeChairRelax', BX+2.6, ZK+.95, L, Math.PI+.4, {carpet:0x2f3f66});
+place('lampRoundFloor', W-.5, ZK+5.0, L, 0);
+place('bookcaseOpenLow', XB+.55, ZB+.25, L, 0); place('books', XB+.3, ZB+.25, L+.82, 0); place('plantSmall2', XB+.8, ZB+.25, L+.82, 0);
+place('pottedPlant', XG+.4, ZB+.5, L, 0); place('pottedPlant', W-.5, D-.5, L, .7);
+place('rugRectangle', ST+.6, ZK+2.6, L+.01, R, {carpet:0x2f3f66, carpetDarker:0xefe3cf});
+place('benchCushionLow', XB+.5, ZK+1.6, L, R, {carpet:0xd39a3c});
+place('lampWall', XB+.02, ZK+.9, L+1.9, R); place('lampWall', W-.14, D-1.5, L+1.9, -R);
+// санузел (XG..XB × ZK..ZB, уровень L)
+place('toilet', XG+.62, ZB-.5, L, R);
+place('bathroomSink', XB-.42, ZK+.5, L-.2, -R); place('bathroomMirror', XB-.12, ZK+.5, L+1.55, -R); place('bathroomCabinet', XB-.35, ZK+1.1, L+1.1, -R);
+place('showerRound', XG+.62, ZK+.72, L, 0);
+// спальня (0..XG × ZK..D, уровень L)
+place('bedDouble', 1.3, ZK+2.1, L, R, {carpet:0xa8583f, carpetWhite:0xefe3cf});
+place('pillow', .9, ZK+1.3, L+.5, R, {carpet:0xd39a3c}); place('pillow', 1.7, ZK+1.3, L+.5, R, {carpet:0x2f3f66});
+place('cabinetBedDrawerTable', .45, ZK+.6, L, 0); place('lampRoundTable', .45, ZK+.6, L+.52, 0);
+place('cabinetBedDrawerTable', 2.3, ZK+.6, L, 0); place('plantSmall1', 2.3, ZK+.6, L+.52, 0);
+place('loungeChairRelax', 3.9, D-1.3, L, -R-.5, {carpet:0xd39a3c}); place('lampRoundFloor', 4.5, D-2.3, L, 0);
+place('bookcaseOpenLow', 1.4, D-.4, L, 0); place('books', 1.1, D-.4, L+.82, 0); place('plantSmall2', 1.75, D-.4, L+.82, 0);
+place('coatRackStanding', 4.5, ZK+.5, L, 0); place('pottedPlant', .5, D-.5, L, 0);
+place('sideTable', 3.6, ZK+.45, L, 0); place('radio', 3.6, ZK+.45, L+.76, 0);
+place('ceilingFan', XG/2, 0, Rz(D/2)-.55, 0);
+// веранда (уровень 0)
+place('tableRound', 8.5, -1.9, 0, 0); for(const [x,z,r] of [[7.6,-1.9,R],[9.4,-1.9,-R],[8.5,-2.7,0]]) place('chairRounded', x, z, 0, r);
+place('pottedPlant', W-.6, -.6, 0, 0); place('pottedPlant', 3.2, -2.9, 0, 0); place('benchCushionLow', 5.2, -2.9, 0, 0, {carpet:0x2f3f66});
+Promise.all(pending).then(()=>{ if(solids.length) collectSolids(); });
 
 // ---------- lights ----------
 scene.add(new T.HemisphereLight(0xcfe3d0, 0x6d6a4a, .65));
 scene.add(new T.AmbientLight(0xffffff, .22));
-const sun = new T.DirectionalLight(0xfff1dc, 1.15); sun.position.set(18,26,9); sun.castShadow = true;
-sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:1,far:90}); sun.shadow.bias=-.0008; sun.shadow.normalBias=.03; scene.add(sun);
-for(const [x,y,z,i,d] of [[8,2.55,1.2,.7,7],[8,L+2.2,5.5,.5,8],[2,3.2,5,.35,6],[5.2,L+2.1,3.45,.25,3],[2,2.6,1.2,.3,4]]){ const p=new T.PointLight(0xffe2b8,i,d); p.position.set(x,y,z); scene.add(p); }
+const sun = new T.DirectionalLight(0xfff1dc, 1.15); sun.position.set(20,28,10); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-26,right:26,top:26,bottom:-26,near:1,far:100}); sun.shadow.bias=-.0008; sun.shadow.normalBias=.03; scene.add(sun);
+for(const [x,y,z,i,d] of [[9,2.55,1.4,.7,7],[BX,L+2.2,ZK+3,.5,9],[2.5,3.2,ZK+3,.35,7],[XG+1.4,L+2.1,ZK+1.4,.25,3],[2.5,2.6,1.4,.3,4],[PC,L+1.6,D-1,.3,5]]){ const p=new T.PointLight(0xffe2b8,i,d); p.position.set(x,y,z); scene.add(p); }
 
 // ---------- labels ----------
 function label(text,x,y,z){ const c=document.createElement('canvas'); c.width=512; c.height=128; const g=c.getContext('2d');
   g.fillStyle='rgba(28,22,18,.78)'; g.beginPath(); g.moveTo(32,16); g.arcTo(496,16,496,112,24); g.arcTo(496,112,16,112,24); g.arcTo(16,112,16,16,24); g.arcTo(16,16,496,16,24); g.closePath(); g.fill();
   g.fillStyle='#f3ede3'; g.font='700 54px Manrope, system-ui, sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,256,66);
   const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; const s=new T.Sprite(new T.SpriteMaterial({map:t,transparent:true,depthTest:false})); s.scale.set(1.9,.475,1); s.position.set(x,y,z); labels.add(s); }
-label('Кухня',8,1.9,1.0); label('Гостевая',2,1.9,1.2); label('Гостиная',9.5,L+1.9,5.4); label('Спальня',2,L+1.9,5.2); label('Санузел',5.2,L+1.9,3.45);
-label('Веранда',6,1.9,-1.7); label('Крыльцо',4.3,L+1.6,9.4); label('Лестница',7.6,1.9,1.9); label('Бар',10.4,L+1.5,2.45); label('♪ Проигрыватель',6.6,L+1.5,7.6);
+label('Кухня',9.5,1.9,1.2); label('Гостевая',2.5,1.9,1.4); label('Гостиная',BX+1,L+1.9,ZK+3.5); label('Спальня',2.5,L+1.9,ZK+3.5); label('Санузел',(XG+XB)/2,L+1.9,(ZK+ZB)/2);
+label('Веранда',W/2,1.9,-1.7); label('Крыльцо',PX/2,L+1.6,D+1.3); label('Лестница',(SB+ST)/2,1.9,ZK-.5); label('Бар',BX+1.8,L+1.5,ZK); label('♪ Проигрыватель',PC,L+1.5,D-.4);
 
 // ---------- views & UI ----------
 const VIEWS = {
-  'Общий вид':[[22,15,22],[6,1.5,4]],
-  'Фасад':[[6,3.2,21],[6,2,6]],
-  'Веранда':[[13,2.1,-5.5],[3,1.3,-1.4]],
-  'Кухня':[[11.6,1.65,1.1],[5,1.4,1.25]],
-  'Гостиная':[[11.5,2.9,7.6],[6.5,2.3,3.6]],
-  'Спальня':[[3.6,2.8,7.6],[.6,2.5,4.6]],
-  'План':[[6,44,4.02],[6,0,4]],
+  'Общий вид':[[24,16,24],[W/2,1.5,D/2]],
+  'Фасад':[[W/2,3.2,D+15],[W/2,2,D-2]],
+  'Веранда':[[W+1,2.1,-5.5],[3,1.3,-1.4]],
+  'Кухня':[[W-.5,1.65,1.2],[XG+1,1.4,1.3]],
+  'Гостиная':[[W-.5,2.9,D-.4],[XG+1.5,2.3,ZK+1]],
+  'Спальня':[[XG-.5,2.8,D-.4],[.6,2.5,ZK+2]],
+  'План':[[W/2,46,D/2+.02],[W/2,0,D/2]],
 };
+
 let tw=null;
 function goTo(name){ leaveWalk(); const [p,t]=VIEWS[name]; tw={p0:camera.position.clone(),t0:controls.target.clone(),p1:new T.Vector3(...p),t1:new T.Vector3(...t),s:performance.now()};
   document.querySelectorAll('#views button').forEach(b=>b.classList.toggle('on',b.textContent===name));
@@ -368,7 +409,7 @@ const roofCb=document.getElementById('roof'); roofCb.onchange=()=>roofG.visible=
 document.getElementById('furn').onchange=e=>furnG.visible=e.target.checked;
 document.getElementById('lbl').onchange=e=>labels.visible=e.target.checked;
 document.getElementById('veg').onchange=e=>vegG.visible=e.target.checked;
-camera.position.set(22,15,22); controls.target.set(6,1.5,4); labels.visible = false;
+camera.position.set(24,16,24); controls.target.set(W/2,1.5,D/2); labels.visible = false;
 controls.addEventListener('start',()=>{ tw=null; });
 const ui=document.getElementById('ui'), fold=document.getElementById('fold');
 fold.onclick=()=>{ ui.classList.toggle('folded'); fold.textContent=ui.classList.contains('folded')?'+':'−'; };
@@ -380,14 +421,14 @@ const EYE = 1.62, walk = {on:false, locked:false, yaw:0, pitch:0, keys:{}, feetY
 let solids = [], walkables = [];
 function collectSolids(){ solids = []; walkables = [ground];
   scene.traverse(o=>{ if(!o.isMesh || o===ground) return; let p=o; while(p){ if(p===vegG||p===labels) return; p=p.parent; }
-    if(o.material===GLASS) return; solids.push(o); walkables.push(o); }); }
+    if(o.material===GLASS || o.userData.noCollide) return; solids.push(o); walkables.push(o); }); }
 const ray = new T.Raycaster(), tmpV = new T.Vector3(), euler = new T.Euler(0,0,0,'YXZ');
 function groundAt(x, yFrom, z){ ray.set(tmpV.set(x, yFrom, z), new T.Vector3(0,-1,0)); ray.far = 30; const h = ray.intersectObjects(walkables, false); return h.length ? h[0].point.y : 0; }
 function blockedDir(px, pz, dx, dz){ const len = Math.hypot(dx,dz); if(len<1e-6) return false; const d = new T.Vector3(dx/len,0,dz/len);
   for(const hy of [.35, .8, 1.25, 1.62]){ ray.set(tmpV.set(px - d.x*.25, walk.feetY+hy, pz - d.z*.25), d); ray.far = .7; if(ray.intersectObjects(solids, false).length) return true; } return false; }
 function startWalk(){ if(walk.on) return; if(!solids.length) collectSolids(); tw = null;
-  const sx = 9.6, sz = 13.2; walk.feetY = groundAt(sx, 3, sz); camera.position.set(sx, walk.feetY+EYE, sz);
-  walk.yaw = Math.atan2(-(6-sx), -(8-sz)); walk.pitch = 0; walk.keys = {}; walk.spaces = [];
+  const sx = PX+1.6, sz = D+4.6; walk.feetY = groundAt(sx, 3, sz); camera.position.set(sx, walk.feetY+EYE, sz);
+  walk.yaw = Math.atan2(-(W/2-sx), -(D-sz)); walk.pitch = 0; walk.keys = {}; walk.spaces = [];
   walk.on = true; controls.enabled = false; walkHud.hidden = false; cross.hidden = false; applyLook(); walkBtn.textContent = '⏏ Выйти из прогулки'; }
 function applyLook(){ euler.set(walk.pitch, walk.yaw, 0); camera.quaternion.setFromEuler(euler); }
 function leaveWalk(){ if(!walk.on) return; if(document.pointerLockElement === canvas) document.exitPointerLock();
@@ -424,7 +465,6 @@ let downAt = null;
 canvas.addEventListener('pointerdown', e=>{ if(e.button!==0) return; downAt=[e.clientX,e.clientY]; });
 canvas.addEventListener('pointerup', e=>{ if(e.button!==0||!downAt) return; const moved=Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1]); downAt=null; if(moved>6 && !walk.on) return; if(walk.on && !walk.locked) return; if(furnG.visible && hitPlayer(e.clientX,e.clientY)) togglePlay(); });
 canvas.addEventListener('pointermove', e=>{ if(walk.on) return; canvas.style.cursor = (furnG.visible && hitPlayer(e.clientX,e.clientY)) ? 'pointer' : ''; });
-const pPos = new T.Vector3(6.6, L+.7, 7.7);
 function tickPlayer(dt){ if(!playing) return; platter.rotation.y += dt*3.5; const d=camera.position.distanceTo(pPos); audio.volume = Math.max(.12, Math.min(1, 3.5/d)); }
 
 addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
