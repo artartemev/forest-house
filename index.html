@@ -290,7 +290,7 @@ wallZ(-.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
 wallZ(W+.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
 railX(0,PX-.05,D+2.55,L); railZ(D+.15,D+2.55,.05,L); railZ(D+.15,D+1.3,PX-.05,L);
 for(let i=0;i<8;i++){ const x1=PX+.3*i, top=L-L/8*(i+1); boxAt(x1,x1+.3,0,top+L/8,D+1.4,D+2.4,mat('deck',.3,1)); }
-railZ(D+1.4,D+2.4,PX,L,.9);
+for(const z of [D+1.4, D+2.4]){ const len=Math.hypot(2.4,L); const r=box(len,.06,.08,POST,PX+1.2,L/2+.9,z); r.rotation.z=Math.atan2(-L,2.4); for(let i=0;i<8;i++) box(.04,.9,.04,POST,PX+.15+.3*i,L-L/8*(i+1)+L/8+.45,z); }
 
 // ---------- furniture (процедурная часть) ----------
 const F = furnG, DARK = solid(0x3f2a1b);
