@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дом в лесу 3D</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&display=swap">
+<style>
+:root{--bg:#d6e5ec;--panel:rgba(40,31,26,.88);--fg:#f3ede3;--muted:#b8ad9d;--accent:#d9b25c;--line:rgba(255,255,255,.12)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1c2a31;--panel:rgba(24,19,16,.9);--fg:#f3ede3;--muted:#a89f92;--accent:#e0bb62;--line:rgba(255,255,255,.1)}}
+:root[data-theme="dark"]{--bg:#1c2a31;--panel:rgba(24,19,16,.9);--fg:#f3ede3;--muted:#a89f92;--accent:#e0bb62;--line:rgba(255,255,255,.1)}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Manrope,system-ui,-apple-system,sans-serif;overflow:hidden}
+#c{display:block;width:100vw;height:100vh;touch-action:none}
+#ui{position:fixed;top:14px;left:14px;background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;width:212px;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:13px}
+#ui .ttl{font-weight:700;font-size:15px;letter-spacing:.01em;display:flex;justify-content:space-between;align-items:center}
+#fold{font:inherit;font-weight:700;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:8px;width:26px;height:26px;cursor:pointer;line-height:1}
+#ui.folded>*:not(.ttl){display:none}
+#ui.folded{width:auto}
+#ui .sub{color:var(--muted);font-size:11.5px;line-height:1.4;margin-top:-6px}
+#views{display:flex;flex-wrap:wrap;gap:6px}
+#views button{font:inherit;font-weight:600;font-size:12px;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 10px;cursor:pointer}
+#views button:hover{border-color:var(--accent)}
+#views button.on{background:var(--accent);color:#2a2018;border-color:var(--accent)}
+#views button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tog{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:8px}
+.tog label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.tog input{accent-color:var(--accent)}
+#walkBtn{font:inherit;font-weight:700;font-size:13px;color:#2a2018;background:var(--accent);border:0;border-radius:10px;padding:8px 10px;cursor:pointer}
+#walkBtn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+#walkHud{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--panel);color:var(--fg);border-radius:12px;padding:8px 14px;font-size:12.5px;white-space:nowrap}
+#np{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--panel);color:var(--fg);border-radius:999px;padding:7px 14px;font-size:12.5px;white-space:nowrap}
+#np b{color:var(--accent)}
+#cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.hint{color:var(--muted);font-size:11px;line-height:1.45;border-top:1px solid var(--line);padding-top:8px}
+.legend{position:fixed;right:14px;bottom:14px;background:var(--panel);backdrop-filter:blur(10px);border-radius:12px;padding:8px 12px;font-size:11.5px;color:var(--muted);line-height:1.5;max-width:260px}
+.legend b{color:var(--fg);font-weight:700}
+@media (max-width:640px){#ui{width:calc(100vw - 28px)}.legend{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="ttl">Дом в лесу — 3D <button id="fold" aria-label="Свернуть панель">−</button></div>
+  <div class="sub">Реконструкция по фото и плану. Размеры оценочные (дом ≈ 12 × 8 м).</div>
+  <div id="views"></div>
+  <div class="tog">
+    <label><input type="checkbox" id="roof" checked> Крыша</label>
+    <label><input type="checkbox" id="furn" checked> Мебель</label>
+    <label><input type="checkbox" id="lbl"> Подписи комнат</label>
+    <label><input type="checkbox" id="veg" checked> Лес</label>
+  </div>
+  <button id="walkBtn">🚶 Прогулка от первого лица</button>
+  <div class="hint">ЛКМ — вращать · ПКМ / два пальца — двигать · колесо — приближать</div>
+</div>
+<div id="walkHud" hidden><span id="hudLock">клик по сцене — захватить мышь · </span><b>W A S D</b> — идти · <b>Shift</b> — бежать · <b>Пробел ×3</b> — выйти из прогулки</div>
+<div id="cross" hidden></div>
+<div id="np" hidden>♪ Играет: <b>Пыль</b> · клик по проигрывателю — стоп</div>
+<div class="legend"><b>Уровни:</b> кухня, гостевая и веранда — на земле (±0); гостиная, спальня, санузел и крыльцо — на +1,3 м, подъём по лестнице из кухни.</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const T = THREE;
+const L = 1.3;            // уровень гостиной/спальни
+const H = 3.6;            // высота стен до карниза
+const Rz = z => 5.6 - 0.5*Math.abs(z-4);   // высота крыши в точке z
+
+// ---------- scene ----------
+const canvas = document.getElementById('c');
+const renderer = new T.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+renderer.outputEncoding = T.sRGBEncoding;
+renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new T.Scene();
+scene.background = new T.Color(0xc4d6c6);
+scene.fog = new T.Fog(0xc4d6c6, 28, 95);
+const camera = new T.PerspectiveCamera(55, innerWidth/innerHeight, 0.08, 400);
+const controls = new T.OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.4; controls.maxDistance = 90; controls.maxPolarAngle = Math.PI*0.7;
+
+const roofG = new T.Group(), furnG = new T.Group(), labels = new T.Group(), vegG = new T.Group();
+scene.add(roofG, furnG, labels, vegG);
+
+// ---------- textures ----------
+let seed = 11; const rnd = () => { seed = (seed*16807) % 2147483647; return (seed-1)/2147483646; };
+function vary(h, j){ const r=(h>>16)&255, g=(h>>8)&255, b=h&255; const d=(rnd()*2-1)*j; const c=v=>Math.max(0,Math.min(255,Math.round(v+d))); return `rgb(${c(r)},${c(g)},${c(b)})`; }
+const TEX = {}, SCALE = {};
+function defTex(name, scale, size, draw){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding; t.anisotropy = 8;
+  TEX[name] = t; SCALE[name] = scale;
+}
+function bricks(g, s, mortar, base, j){ g.fillStyle = mortar; g.fillRect(0,0,s,s); const bh=s/8, bw=s/4; for(let r=0;r<8;r++){ const off=(r%2)?bw/2:0; for(let c=-1;c<5;c++){ g.fillStyle=vary(base,j); g.fillRect(c*bw+off+3, r*bh+3, bw-6, bh-6); } } }
+defTex('whiteBrick', 1, 512, (g,s)=>bricks(g,s,'#d8d3c8',0xf2efe7,9));
+defTex('redBrick', 1, 512, (g,s)=>bricks(g,s,'#b7a892',0xa9583b,20));
+function planks(g, s, n, base, j, vertical){
+  const w = s/n;
+  for(let i=0;i<n;i++){
+    g.fillStyle = vary(base, j);
+    vertical ? g.fillRect(i*w,0,w,s) : g.fillRect(0,i*w,s,w);
+    g.strokeStyle='rgba(0,0,0,.4)'; g.lineWidth=2;
+    vertical ? g.strokeRect(i*w+1,0,w-2,s) : g.strokeRect(0,i*w+1,s,w-2);
+    g.strokeStyle='rgba(0,0,0,.14)'; g.lineWidth=1;
+    for(let k=0;k<5;k++){ const p=i*w+rnd()*w; g.beginPath();
+      if(vertical){ g.moveTo(p,0); g.bezierCurveTo(p+5,s/3,p-5,2*s/3,p,s); } else { g.moveTo(0,p); g.bezierCurveTo(s/3,p+5,2*s/3,p-5,s,p); }
+      g.stroke(); }
+    if(!vertical){ const e = rnd()*s; g.strokeStyle='rgba(0,0,0,.45)'; g.lineWidth=2; g.beginPath(); g.moveTo(e,i*w); g.lineTo(e,i*w+w); g.stroke(); }
+  }
+}
+defTex('darkWood', 1, 512, (g,s)=>planks(g,s,8,0x55351f,14,true));
+defTex('woodFloor', 1, 512, (g,s)=>planks(g,s,6,0x67472e,12,false));
+defTex('deck', 1, 512, (g,s)=>planks(g,s,7,0x8a6742,12,false));
+function tiles(g,s,n,grout,base,j){ g.fillStyle=grout; g.fillRect(0,0,s,s); const w=s/n; for(let i=0;i<n;i++)for(let k=0;k<n;k++){ g.fillStyle=vary(base,j); g.fillRect(i*w+2,k*w+2,w-4,w-4);} }
+defTex('terracotta', 1, 512, (g,s)=>tiles(g,s,3,'#b9a690',0xb96a4a,12));
+defTex('whiteTile', 1, 512, (g,s)=>tiles(g,s,5,'#cfcfc7',0xf3f3ee,4));
+defTex('corrugated', 1, 256, (g,s)=>{ for(let x=0;x<s;x++){ const v=0.5+0.5*Math.sin(x/s*Math.PI*2*10); const c=Math.round(100+75*v); g.fillStyle=`rgb(${c},${c+2},${c+4})`; g.fillRect(x,0,1,s);} for(let i=0;i<16;i++){ g.fillStyle=`rgba(150,85,40,${0.12+rnd()*0.22})`; g.fillRect(rnd()*s, rnd()*s, 5+rnd()*9, 40+rnd()*140);} });
+defTex('woven', 0.6, 256, (g,s)=>{ g.fillStyle='#c8a86c'; g.fillRect(0,0,s,s); g.strokeStyle='rgba(90,60,30,.28)'; g.lineWidth=1; for(let i=0;i<s;i+=7){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,s); g.stroke(); g.beginPath(); g.moveTo(0,i); g.lineTo(s,i); g.stroke(); } });
+defTex('stone', 2, 512, (g,s)=>{ g.fillStyle='#a3a39c'; g.fillRect(0,0,s,s); for(let i=0;i<70;i++){ const x=rnd()*s,y=rnd()*s,r=28+rnd()*48; g.fillStyle=vary(0x6b6d68,18); g.beginPath(); for(let k=0;k<6;k++){ const a=k/6*Math.PI*2; g.lineTo(x+Math.cos(a)*r*(0.6+rnd()*0.5), y+Math.sin(a)*r*(0.6+rnd()*0.5)); } g.closePath(); g.fill(); } });
+defTex('kilim', 1.6, 512, (g,s)=>{ const cols=['#b9512f','#e0b04d','#2f3f66','#efe3cf','#7a3b2a']; const rows=14, h=s/rows; for(let r=0;r<rows;r++){ g.fillStyle=cols[r%cols.length]; g.fillRect(0,r*h,s,h); g.fillStyle='rgba(20,10,5,.25)'; for(let x=0;x<s;x+=h){ g.beginPath(); g.moveTo(x,r*h+h); g.lineTo(x+h/2,r*h); g.lineTo(x+h,r*h+h); g.closePath(); if(r%2) g.fill(); } } });
+defTex('rattan', 0.5, 256, (g,s)=>{ g.fillStyle='#c9a061'; g.fillRect(0,0,s,s); g.strokeStyle='rgba(80,50,20,.35)'; g.lineWidth=3; for(let i=0;i<s;i+=10){ g.beginPath(); g.moveTo(i,0); g.lineTo(i,s); g.stroke(); g.beginPath(); g.moveTo(0,i); g.lineTo(s,i); g.stroke(); } });
+defTex('ground', 4, 512, (g,s)=>{ g.fillStyle='#b19c7c'; g.fillRect(0,0,s,s); for(let i=0;i<400;i++){ g.fillStyle=vary(0x9a8460,26); g.beginPath(); g.ellipse(rnd()*s,rnd()*s,3+rnd()*7,2+rnd()*4,rnd()*3,0,7); g.fill(); } });
+
+function mat(kind, w=1, h=1, ox=0, oy=0, opts={}){ const t = TEX[kind].clone(); t.needsUpdate = true; const sc = SCALE[kind]; t.repeat.set(w/sc, h/sc); t.offset.set(ox/sc, oy/sc); return new T.MeshStandardMaterial(Object.assign({map:t, roughness:.92, metalness:0}, opts)); }
+function solid(color, opts={}){ return new T.MeshStandardMaterial(Object.assign({color, roughness:.8, metalness:0}, opts)); }
+const FRAME = solid(0x4a3220), RAIL = solid(0xf1ece3), POST = solid(0x4b3120), CONCRETE = solid(0xaaa59b), WHITE = solid(0xf4f3ef), CREAM = solid(0xe9e2d2);
+const GLASS = new T.MeshPhysicalMaterial({color:0xcfe6ee, transparent:true, opacity:.3, roughness:.15, metalness:0, side:T.DoubleSide});
+const METAL = solid(0xb9bcc0, {metalness:.75, roughness:.3});
+
+// ---------- primitives ----------
+function box(w,h,d,m,x,y,z,parent=scene){ const mesh = new T.Mesh(new T.BoxGeometry(w,h,d), m); mesh.position.set(x,y,z); mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh); return mesh; }
+function boxAt(x1,x2,y1,y2,z1,z2,m,parent=scene){ return box(x2-x1,y2-y1,z2-z1,m,(x1+x2)/2,(y1+y2)/2,(z1+z2)/2,parent); }
+function cyl(r,h,m,x,y,z,parent=scene,rt=r){ const mesh = new T.Mesh(new T.CylinderGeometry(rt,r,h,18), m); mesh.position.set(x,y,z); mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh); return mesh; }
+function floorAt(x1,x2,z1,z2,yTop,th,kind,parent=scene){ const side = solid(0x5b4a3a); const top = mat(kind, x2-x1, z2-z1, x1, z1); return boxAt(x1,x2,yTop-th,yTop,z1,z2,[side,side,top,side,side,side],parent); }
+
+function shapeOf(pts, holes){ const s = new T.Shape(pts.map(p=>new T.Vector2(p[0],p[1]))); for(const [a,b,c,d] of holes){ const h = new T.Path(); h.moveTo(a,c); h.lineTo(b,c); h.lineTo(b,d); h.lineTo(a,d); h.closePath(); s.holes.push(h); } return s; }
+function wmat(k){ return typeof k === 'string' ? mat(k) : k; }
+function slab(shape, d, m){ const g = new T.ExtrudeGeometry(shape, {depth:d, bevelEnabled:false}); const mesh = new T.Mesh(g, [m, m]); mesh.castShadow = mesh.receiveShadow = true; return mesh; }
+// стена вдоль X на координате z; pts — контур в (x,y); kPos — материал грани +z, kNeg — грани −z
+function wallX(z, pts, holes, t, kPos, kNeg, parent=scene){ const s = shapeOf(pts, holes); const a = slab(s, t/2, wmat(kPos)); a.position.z = z; const b = slab(s, t/2, wmat(kNeg)); b.position.z = z - t/2; parent.add(a, b); }
+// стена вдоль Z на координате x; pts — контур в (z,y); kPos — грань +x, kNeg — грань −x
+function wallZ(x, pts, holes, t, kPos, kNeg, parent=scene){ const s = shapeOf(pts, holes); const a = slab(s, t/2, wmat(kPos)); a.rotation.y = -Math.PI/2; a.position.x = x + t/2; const b = slab(s, t/2, wmat(kNeg)); b.rotation.y = -Math.PI/2; b.position.x = x; parent.add(a, b); }
+
+function winX(z,a,b,y0,y1,t=0.22){ const f=.06, w=b-a, h=y1-y0, cy=(y0+y1)/2, cx=(a+b)/2;
+  box(w,f,t+.04,FRAME,cx,y0+f/2,z); box(w,f,t+.04,FRAME,cx,y1-f/2,z); box(f,h,t+.04,FRAME,a+f/2,cy,z); box(f,h,t+.04,FRAME,b-f/2,cy,z);
+  const n=Math.max(1,Math.round(w/.7)); for(let i=1;i<n;i++) box(.04,h,t+.02,FRAME,a+w*i/n,cy,z);
+  if(h>1) box(w,.04,t+.02,FRAME,cx,cy,z);
+  const g=box(w-2*f,h-2*f,.02,GLASS,cx,cy,z); g.castShadow=false; }
+function winZ(x,a,b,y0,y1,t=0.22){ const f=.06, w=b-a, h=y1-y0, cy=(y0+y1)/2, cz=(a+b)/2;
+  box(t+.04,f,w,FRAME,x,y0+f/2,cz); box(t+.04,f,w,FRAME,x,y1-f/2,cz); box(t+.04,h,f,FRAME,x,cy,a+f/2); box(t+.04,h,f,FRAME,x,cy,b-f/2);
+  const n=Math.max(1,Math.round(w/.7)); for(let i=1;i<n;i++) box(t+.02,h,.04,FRAME,x,cy,a+w*i/n);
+  if(h>1) box(t+.02,.04,w,FRAME,x,cy,cz);
+  const g=box(.02,h-2*f,w-2*f,GLASS,x,cy,cz); g.castShadow=false; }
+const LEAF = solid(0x6b4a2e);
+function doorX(z,a,b,y0,h,t,ang){ const f=.06, w=b-a; box(f,h,t+.04,FRAME,a+f/2,y0+h/2,z); box(f,h,t+.04,FRAME,b-f/2,y0+h/2,z); box(w,f,t+.04,FRAME,(a+b)/2,y0+h-f/2,z);
+  const g=new T.Group(); g.position.set(a+f,y0,z); g.rotation.y=ang; scene.add(g); box(w-2*f,h-.05,.045,LEAF,(w-2*f)/2,h/2,0,g); cyl(.02,.02,METAL,w-2*f-.1,1.0,.05,g); }
+function doorZ(x,a,b,y0,h,t,ang){ const f=.06, w=b-a; box(t+.04,h,f,FRAME,x,y0+h/2,a+f/2); box(t+.04,h,f,FRAME,x,y0+h/2,b-f/2); box(t+.04,f,w,FRAME,x,y0+h-f/2,(a+b)/2);
+  const g=new T.Group(); g.position.set(x,y0,a+f); g.rotation.y=ang; scene.add(g); box(.045,h-.05,w-2*f,LEAF,0,h/2,(w-2*f)/2,g); cyl(.02,.02,METAL,.05,1.0,w-2*f-.1,g); }
+const dh = (a,b,y0) => [a,b,y0+.01,y0+2.1]; // проём двери (чуть выше низа контура, чтобы не ломать триангуляцию)
+function railX(x1,x2,z,y0,h=.9,m=POST){ box(x2-x1,.06,.08,m,(x1+x2)/2,y0+h,z); for(let x=x1;x<=x2+.001;x+=.3) box(.04,h,.04,m,x,y0+h/2,z); }
+function railZ(z1,z2,x,y0,h=.9,m=POST){ box(.08,.06,z2-z1,m,x,y0+h,(z1+z2)/2); for(let z=z1;z<=z2+.001;z+=.3) box(.04,h,.04,m,x,y0+h/2,z); }
+
+// ---------- ground & trees ----------
+const ground = new T.Mesh(new T.PlaneGeometry(220,220), mat('ground',220,220)); ground.rotation.x = -Math.PI/2; ground.position.y = -0.01; ground.receiveShadow = true; scene.add(ground);
+const TRUNK = solid(0x5c4a36), TRUNK2 = solid(0x7a6a52);
+const GREENS = [0x2f5d2a, 0x3b7331, 0x4a873a, 0x2b4f27, 0x57944a, 0x6aa04f];
+const gm = () => solid(GREENS[Math.floor(rnd()*GREENS.length)], {roughness:.95});
+function blob(x,y,z,r,sy=.75,m=null){ const b=new T.Mesh(new T.SphereGeometry(r,12,9), m||gm()); b.position.set(x,y,z); b.scale.set(1,sy,1); b.castShadow=b.receiveShadow=true; vegG.add(b); return b; }
+// высокое дерево джунглей: тонкий ствол, крона высоко, часто второй ярус
+function jungleTree(x,z){ const h=8+rnd()*7, r=.14+rnd()*.12; cyl(r,h,TRUNK,x,h/2,z,vegG,r*.55);
+  const n=5+Math.floor(rnd()*3); for(let i=0;i<n;i++) blob(x+(rnd()-.5)*4.2, h+(rnd()-.35)*2.4, z+(rnd()-.5)*4.2, 1.3+rnd()*1.5, .55+rnd()*.3);
+  if(rnd()<.6){ const y=h*(.45+rnd()*.25); for(let i=0;i<3;i++) blob(x+(rnd()-.5)*3, y+(rnd()-.5), z+(rnd()-.5)*3, .8+rnd()*.9, .5); }
+  // пара толстых ветвей
+  for(let i=0;i<2;i++){ const a=rnd()*Math.PI*2, len=2+rnd()*2; const b=cyl(r*.5,len,TRUNK,x+Math.cos(a)*len*.35,h*(.6+rnd()*.3),z+Math.sin(a)*len*.35,vegG,r*.25); b.rotation.set(Math.sin(a)*1.1,0,-Math.cos(a)*1.1); } }
+// пальма: слегка наклонённый ствол и веер листьев
+function palm(x,z){ const h=4+rnd()*4, tilt=(rnd()-.5)*.35, dir=rnd()*Math.PI*2; const t=cyl(.14,h,TRUNK2,x+Math.sin(tilt)*h/2*Math.cos(dir),h/2,z+Math.sin(tilt)*h/2*Math.sin(dir),vegG,.1); t.rotation.set(Math.sin(dir)*tilt,0,-Math.cos(dir)*tilt);
+  const tx=x+Math.sin(tilt)*h*Math.cos(dir), tz=z+Math.sin(tilt)*h*Math.sin(dir); const m=gm();
+  for(let i=0;i<9;i++){ const a=i/9*Math.PI*2+rnd()*.4, len=2.2+rnd()*.8; const f=new T.Mesh(new T.SphereGeometry(1,8,6), m); f.scale.set(.32,.07,len/2); f.position.set(tx+Math.sin(a)*len*.45, h-.35, tz+Math.cos(a)*len*.45); f.rotation.set(-.55,a,0,'YXZ'); f.castShadow=f.receiveShadow=true; vegG.add(f); } }
+// подлесок: кусты, банановые листья, папоротник
+function undergrowth(x,z,s=1){ const n=3+Math.floor(rnd()*3); for(let i=0;i<n;i++) blob(x+(rnd()-.5)*1.6*s, (.35+rnd()*.3)*s, z+(rnd()-.5)*1.6*s, (.35+rnd()*.45)*s, .8);
+  if(rnd()<.4){ const m=gm(); for(let i=0;i<5;i++){ const a=rnd()*Math.PI*2, f=new T.Mesh(new T.SphereGeometry(1,7,5), m); f.scale.set(.25,.05,1.1); f.position.set(x+Math.sin(a)*.8, 1.2+rnd()*.5, z+Math.cos(a)*.8); f.rotation.set(-.9,a,0,'YXZ'); f.castShadow=true; vegG.add(f); } } }
+const inHouse=(x,z,px,pz)=>x>-3-px&&x<15+px&&z>-6-pz&&z<13+pz;
+// просветы вдоль линий обзора «Общий вид» и «Фасад», чтобы кроны не закрывали дом
+const distSeg=(x,z,ax,az,bx,bz)=>{ const dx=bx-ax,dz=bz-az; const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz))); return Math.hypot(x-(ax+dx*t), z-(az+dz*t)); };
+const blocked=(x,z)=>distSeg(x,z,22,22,6,4)<7 || distSeg(x,z,6,21,6,6)<5 || Math.hypot(x-22,z-22)<10;
+// ближний пояс — деревья вплотную к дому, дальний — сплошная стена леса
+for(let i=0;i<70;i++){ let x,z; do { x=-24+rnd()*62; z=-24+rnd()*58; } while(inHouse(x,z,0,0)||blocked(x,z)); (rnd()<.22?palm:jungleTree)(x,z); }
+for(let i=0;i<90;i++){ let x,z; do { x=-48+rnd()*110; z=-48+rnd()*104; } while(inHouse(x,z,20,20)||blocked(x,z)); (rnd()<.15?palm:jungleTree)(x,z); }
+for(const [x,z] of [[-2,-4.5],[14.2,-4],[-2.2,10],[-1.5,3],[14,1.5],[6,-6]]) jungleTree(x,z);
+for(const [x,z] of [[13,-1],[-1.5,12],[1.5,13.5]]) palm(x,z);
+for(let i=0;i<110;i++){ let x,z; do { x=-30+rnd()*74; z=-30+rnd()*70; } while(inHouse(x,z,-1.5,-1.5)); undergrowth(x,z,.8+rnd()*.7); }
+for(let x=-.5;x<9.5;x+=.55) blob(x, .5, 11.4+(rnd()-.5)*.5, .4+rnd()*.25, .85);
+for(let x=9.5;x<12.5;x+=.6) blob(x, .45, 8.8+(rnd()-.5)*.6, .35+rnd()*.2, .85);
+for(let z=2.6;z<8;z+=.6) blob(-.7, .45, z, .35+rnd()*.2, .85);
+for(let z=-3;z<0;z+=.7) blob(12.9, .5, z, .4+rnd()*.2, .85);
+
+// ---------- floors ----------
+floorAt(4.1,12,0,2.4,0,.15,'terracotta');            // кухня
+floorAt(0,4.1,0,2.4,0,.15,'terracotta');             // гостевая
+floorAt(0,12,2.4,8.1,L,.28,'woodFloor');             // гостиная + спальня (приподнятая часть)
+floorAt(4.1,6.3,2.4,4.5,L+.015,.02,'whiteTile');     // санузел
+floorAt(-.2,12.2,-3.4,0,.03,.12,'stone');            // веранда
+floorAt(0,8.6,8.1,10.6,L,.15,'deck');                // крыльцо
+// опоры под приподнятой частью
+for(const x of [.3,3,6,9,11.7]) for(const z of [2.7,5.2,7.8]) cyl(.12,L-.28,CONCRETE,x,(L-.28)/2,z);
+for(const x of [.3,4.4,8.3]) for(const z of [8.4,10.3]) box(.16,L-.15,.16,POST,x,(L-.15)/2,z);
+
+// ---------- exterior walls ----------
+// север (z=0): внутри белый кирпич, снаружи красный
+wallX(0, [[0,0],[12,0],[12,H],[0,H]], [[1.3,2.4,1.3,2.4],[5.0,10.2,1.15,2.4],dh(10.8,11.8,0)], .22, 'whiteBrick', 'redBrick');
+winX(0,1.3,2.4,1.3,2.4); winX(0,5.0,10.2,1.15,2.4); doorX(0,10.8,11.8,0,2.1,.22,-1.25);
+// юг (z=8)
+wallX(8, [[0,L],[4.1,L],[4.1,H],[0,H]], [[1.2,2.4,L+1,L+2]], .22, 'darkWood', 'whiteBrick'); winX(8,1.2,2.4,L+1,L+2);
+wallX(8, [[4.1,L],[12,L],[12,H],[4.1,H]], [dh(4.4,5.4,L),[8.6,11,L+1,L+2]], .22, 'darkWood', 'darkWood'); winX(8,8.6,11,L+1,L+2); doorX(8,4.4,5.4,L,2.1,.22,-1.2);
+// запад (x=0): гостевая от земли, спальня от +1.3; внутри кирпич до карниза, выше — дерево
+wallZ(0, [[0,0],[2.4,0],[2.4,L],[8,L],[8,H],[0,H]], [[4.4,5.6,L+1,L+2]], .22, 'whiteBrick', 'darkWood'); winZ(0,4.4,5.6,L+1,L+2);
+wallZ(0, [[0,H],[8,H],[4,5.6]], [], .22, 'darkWood', 'darkWood');
+// восток (x=12)
+wallZ(12, [[0,0],[2.4,0],[2.4,H],[0,H]], [], .22, 'darkWood', 'whiteBrick');
+wallZ(12, [[2.4,L],[8,L],[8,H],[2.4,H]], [[3.4,7.4,L+1,L+2]], .22, 'darkWood', 'darkWood'); winZ(12,3.4,7.4,L+1,L+2);
+wallZ(12, [[0,H],[8,H],[4,5.6]], [], .22, 'darkWood', 'darkWood');
+
+// ---------- interior walls ----------
+// кухня / гостевая (x=4.1)
+wallZ(4.1, [[0,0],[2.4,0],[2.4,Rz(2.4)],[0,H]], [dh(.8,1.7,0)], .16, 'whiteBrick', 'whiteBrick'); doorZ(4.1,.8,1.7,0,2.1,.16,1.2);
+// спальня / гостевая (z=2.4)
+wallX(2.4, [[0,0],[4.1,0],[4.1,L],[0,L]], [], .22, 'whiteBrick', 'whiteBrick');
+wallX(2.4, [[0,L],[4.1,L],[4.1,Rz(2.4)],[0,Rz(2.4)]], [], .16, 'whiteBrick', 'whiteBrick');
+// граница кухня / гостиная (z=2.4)
+wallX(2.4, [[4.1,0],[12,0],[12,L],[4.1,L]], [], .22, 'whiteBrick', 'whiteBrick');                  // подпорная под гостиной
+wallX(2.4, [[4.1,L],[6.4,L],[6.4,Rz(2.4)],[4.1,Rz(2.4)]], [], .16, 'darkWood', 'whiteBrick');       // глухая часть
+wallX(2.4, [[7.6,L],[8.8,L],[8.8,L+1],[7.6,L+1]], [], .12, 'darkWood', 'darkWood');                // полустенка у лестницы
+wallX(2.4, [[8.8,L],[12,L],[12,L+1],[8.8,L+1]], [], .12, 'darkWood', 'darkWood');                  // барная стойка
+boxAt(8.8,12,L+1,L+1.05,2.1,2.75,CREAM); boxAt(7.6,8.8,L+1,L+1.04,2.3,2.5,POST);
+box(.18,Rz(2.5)-L,.18,POST,8.8,(Rz(2.5)+L)/2,2.5);
+// перегородка в гостиной (x=8.8)
+wallZ(8.8, [[2.9,L],[5.6,L],[5.6,L+1],[2.9,L+1]], [], .12, 'darkWood', 'darkWood'); boxAt(8.7,8.9,L+1,L+1.04,2.9,5.6,POST);
+box(.18,Rz(5.6)-L,.18,POST,8.8,(Rz(5.6)+L)/2,5.6);
+// спальня / гостиная (x=4.1): низ — кирпич со стороны спальни, дерево со стороны гостиной; верх — дерево
+wallZ(4.1, [[2.4,L],[8,L],[8,H],[2.4,H]], [dh(3.1,4.0,L),dh(6.0,6.9,L)], .16, 'darkWood', 'whiteBrick');
+wallZ(4.1, [[2.4,H],[8,H],[4,5.6],[2.4,Rz(2.4)]], [], .16, 'darkWood', 'darkWood');
+doorZ(4.1,3.1,4.0,L,2.1,.16,1.3); doorZ(4.1,6.0,6.9,L,2.1,.16,-1.3);
+// санузел
+wallZ(4.19, [[2.4,L],[4.5,L],[4.5,L+2.25],[2.4,L+2.25]], [dh(3.1,4.0,L)], .02, 'whiteTile', 'whiteTile'); // облицовка изнутри
+wallX(2.5, [[4.1,L],[6.3,L],[6.3,L+2.25],[4.1,L+2.25]], [], .02, 'whiteTile', 'whiteTile'); // плитка на стене кухни
+wallZ(6.3, [[2.4,L],[4.5,L],[4.5,L+2.25],[2.4,L+2.25]], [dh(3.1,4.0,L),[4.1,4.4,L+1.4,L+1.9]], .12, 'whiteBrick', 'whiteTile');
+doorZ(6.3,3.1,4.0,L,2.1,.12,1.3); const gb = boxAt(6.25,6.35,L+1.4,L+1.9,4.1,4.4,new T.MeshPhysicalMaterial({color:0xe8f0f2,transparent:true,opacity:.6,roughness:.4})); gb.castShadow=false;
+wallX(4.5, [[4.1,L],[6.3,L],[6.3,L+2.25],[4.1,L+2.25]], [], .12, 'whiteBrick', 'whiteTile');
+boxAt(4.1,6.3,L+2.25,L+2.33,2.4,4.5,solid(0xe4e0d8));
+
+// ---------- stairs ----------
+const STEP = mat('terracotta',.3,1);
+for(let i=0;i<8;i++){ const x2=8.8-.3*i, x1=x2-.3, top=L/8*(i+1); boxAt(x1,x2,0,top,1.4,2.4,STEP); cyl(.035,.9,RAIL,x1+.15,top+.45,1.45); }
+box(.08,1.05,.08,RAIL,8.85,.52,1.45); box(.08,.95,.08,RAIL,6.4,L+.47,1.45);
+{ const len=Math.hypot(2.5,L); const r=box(len,.07,.1,RAIL,7.62,L/2+.93,1.45); r.rotation.z=Math.atan2(-L,2.5); }
+railZ(1.45,2.4,6.35,L,.9,RAIL);
+
+// ---------- roof ----------
+const ang = Math.atan(0.5), slopeLen = Math.hypot(4.4,2.2);
+function roofPanel(w, len, cx, cy, cz, rot, parent){ const side=solid(0x6b6b66); const m=[side,side,mat('corrugated',w,len),mat('woven',w,len),side,side]; const p=box(w,.1,len,m,cx,cy,cz,parent); p.rotation.x=rot; return p; }
+roofPanel(12.8, slopeLen, 6, 4.5, 1.8, -ang, roofG);
+roofPanel(12.8, slopeLen, 6, 4.5, 6.2, ang, roofG);
+box(12.9,.12,.32,solid(0x55554f),6,5.63,4,roofG);
+for(let x=.6;x<12;x+=1.15){ for(const s of [1,-1]){ const r=box(.1,.16,4.6,POST,x,4.36,4-s*2.15,roofG); r.rotation.x=-s*ang; } }
+box(12.4,.16,.16,POST,6,5.42,4,roofG);
+// навес веранды
+{ const a=Math.atan(.65/3.1), len=Math.hypot(3.1,.65); roofPanel(12.6,len,6,3.07,-1.95,-a,roofG); for(let x=.4;x<12;x+=1.5){ const r=box(.08,.14,len-.1,POST,x,2.95,-1.95,roofG); r.rotation.x=-a; } }
+for(const x of [-.1,4,8,12.1]) box(.14,2.75,.14,POST,x,1.375,-3.3);
+// навес крыльца
+{ const a=Math.atan(.25/2.5), len=Math.hypot(2.5,.25); roofPanel(9.2,len,4.3,3.22,9.65,a,roofG); }
+for(const x of [.2,4.4,8.5]) box(.14,3.1-L,.14,POST,x,(3.1+L)/2,10.55);
+
+// ---------- veranda & porch ----------
+wallX(-3.3, [[-.2,0],[12.2,0],[12.2,1],[-.2,1]], [], .2, 'redBrick', 'redBrick');
+wallZ(-.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
+wallZ(12.2, [[-3.3,0],[0,0],[0,1],[-3.3,1]], [], .2, 'redBrick', 'redBrick');
+railX(0,8.55,10.55,L); railZ(8.15,10.55,.05,L); railZ(8.15,9.3,8.55,L);
+for(let i=0;i<8;i++){ const x1=8.6+.3*i, top=L-L/8*(i+1); boxAt(x1,x1+.3,0,top+L/8,9.4,10.4,mat('deck',.3,1)); }
+railZ(9.4,10.4,8.6,L,.9);
+
+// ---------- furniture ----------
+const F = furnG, DARK = solid(0x3f2a1b);
+// кухня
+boxAt(5.0,10.4,0,.82,.15,.75,mat('darkWood',5.4,.82),F); boxAt(4.95,10.45,.82,.87,.12,.8,CREAM,F);
+boxAt(5.4,6.3,.87,.9,.25,.65,METAL,F); cyl(.015,.3,METAL,5.85,1.02,.2,F); cyl(.015,.3,METAL,6.1,1.02,.2,F);
+boxAt(11.2,11.9,0,1.65,1.0,1.7,solid(0x3a3d40,{metalness:.4,roughness:.5}),F);
+{ const cordTop=Rz(1.2)-.15; cyl(.01,cordTop-2.85,solid(0x222),8,(cordTop+2.85)/2,1.2,F); cyl(.34,.35,solid(0xd9dbd8,{metalness:.7,roughness:.3}),8,2.67,1.2,F,.06); }
+boxAt(6.4,7.2,0,.75,.15,.75,DARK,F); // тумба у окна
+// гостевая
+boxAt(.3,1.3,0,.3,.3,2.3,DARK,F); boxAt(.33,1.27,.3,.5,.33,2.27,WHITE,F); boxAt(2.0,2.8,0,.74,.2,.8,DARK,F);
+// гостиная
+const RATTAN = mat('rattan',1,1), OCHRE = solid(0xd39a3c,{roughness:1}), TERRA = solid(0xa8583f,{roughness:1}), INDIGO = solid(0x2f3f66,{roughness:1}), LINEN = solid(0xe9dfc9,{roughness:1});
+// низкая тахта с подушками у восточной стены
+boxAt(10.9,11.9,L,L+.3,4.6,6.9,RATTAN,F); boxAt(10.95,11.85,L+.3,L+.48,4.65,6.85,LINEN,F);
+boxAt(11.45,11.85,L+.48,L+.9,4.7,5.3,OCHRE,F); boxAt(11.45,11.85,L+.48,L+.95,5.4,6.1,INDIGO,F); boxAt(11.45,11.85,L+.48,L+.85,6.2,6.8,TERRA,F);
+// пуфы из ротанга и напольные подушки
+cyl(.3,.4,RATTAN,9.2,L+.2,7.0,F); cyl(.28,.38,RATTAN,8.3,L+.19,6.4,F);
+boxAt(9.9,10.5,L,L+.14,7.0,7.6,TERRA,F); boxAt(10.6,11.2,L,L+.14,7.1,7.7,INDIGO,F);
+// килим под столиком
+boxAt(9.0,11.0,L,L+.02,4.9,6.5,mat('kilim',2,1.6),F);
+// подвесное кашпо у столба
+cyl(.006,1.2,solid(0xd8c7a6),8.8,L+2.9,5.2,F); cyl(.14,.16,TERRA,8.8,L+2.25,5.2,F,.11);
+{ const pl=new T.Mesh(new T.SphereGeometry(.24,10,8), solid(0x4a873a,{roughness:1})); pl.position.set(8.8,L+2.34,5.2); pl.scale.y=.6; pl.castShadow=true; F.add(pl); }
+boxAt(9.5,10.6,L+.38,L+.44,5.2,6.2,DARK,F); for(const [x,z] of [[9.55,5.25],[10.55,5.25],[9.55,6.15],[10.55,6.15]]) boxAt(x-.05,x+.05,L,L+.38,z-.05,z+.05,DARK,F);
+// консоль с проигрывателем у южной стены
+const player = new T.Group(); player.name='player'; F.add(player);
+boxAt(6.0,7.3,L,L+.62,7.45,7.9,RATTAN,player); boxAt(5.97,7.33,L+.62,L+.66,7.42,7.93,DARK,player);
+boxAt(6.35,6.95,L+.66,L+.72,7.5,7.88,solid(0x2a2320,{roughness:.5}),player);
+const platter = cyl(.16,.02,solid(0x111111,{roughness:.35}),6.6,L+.73,7.69,player); cyl(.05,.022,OCHRE,6.6,L+.732,7.69,player);
+const arm = box(.02,.015,.22,METAL,6.85,L+.75,7.62,player); arm.rotation.y=-.5; cyl(.03,.06,METAL,6.9,L+.75,7.55,player);
+boxAt(5.55,5.85,L+.05,L+.5,7.55,7.85,DARK,player); boxAt(7.45,7.75,L+.05,L+.5,7.55,7.85,DARK,player); // колонки
+for(let i=0;i<7;i++){ const r=boxAt(7.0+i*.035,7.02+i*.035,L+.66,L+.97,7.55,7.86,i%2?INDIGO:OCHRE,player); r.rotation.z=.12; }
+boxAt(4.5,5.6,L+.1,L+.85,4.58,5.05,solid(0x6a4527),F); for(const x of [4.55,5.55]) for(const z of [4.63,5.0]) boxAt(x-.03,x+.03,L,L+.1,z-.03,z+.03,DARK,F);
+boxAt(6.5,7.5,L,L+.02,2.55,3.3,solid(0xd9d2c6),F);
+// спальня
+// кровать: рама из тёмного дерева, изголовье из ротанга, бельё
+boxAt(.3,1.9,L+.12,L+.38,4.4,6.5,solid(0x4c3120),F); for(const [x,z] of [[.36,4.46],[1.84,4.46],[.36,6.44],[1.84,6.44]]) boxAt(x-.04,x+.04,L,L+.12,z-.04,z+.04,DARK,F);
+boxAt(.3,1.9,L+.38,L+1.15,4.4,4.5,RATTAN,F);
+boxAt(.35,1.85,L+.38,L+.62,4.52,6.45,LINEN,F);
+boxAt(.35,1.85,L+.62,L+.7,5.25,6.48,TERRA,F); boxAt(.35,1.85,L+.7,L+.72,5.25,5.6,solid(0xe0b04d),F);
+boxAt(.45,1.05,L+.62,L+.78,4.58,5.05,WHITE,F); boxAt(1.15,1.75,L+.62,L+.78,4.58,5.05,WHITE,F);
+cyl(.22,.45,RATTAN,2.25,L+.225,4.65,F); cyl(.06,.28,TERRA,2.25,L+.6,4.65,F,.04);
+boxAt(.6,2.6,L,L+.02,5.2,7.2,mat('kilim',2,2),F);
+boxAt(.12,.38,3.55,3.85,4.6,5.5,WHITE,F);
+boxAt(.13,.17,L+.9,L+2.15,3.9,4.38,solid(0xf3efe6),F); boxAt(.13,.17,L+.9,L+2.15,5.62,6.1,solid(0xf3efe6),F);
+// санузел
+boxAt(4.3,4.75,L,L+.4,4.0,4.4,WHITE,F); boxAt(4.3,4.5,L+.4,L+.8,4.05,4.35,WHITE,F); boxAt(5.7,6.2,L+.8,L+.95,2.6,3.05,WHITE,F);
+// веранда
+boxAt(.5,2.5,0,.8,-.95,-.35,METAL,F); cyl(.15,.05,solid(0x333),0.9,.83,-.65,F); cyl(.15,.6,solid(0x6fb7c9),.6,.3,-1.4,F);
+{ const t=box(.9,.05,.9,CREAM,8,.76,-1.6,F); cyl(.04,.72,DARK,8,.38,-1.6,F); }
+
+// ---------- lights ----------
+scene.add(new T.HemisphereLight(0xcfe3d0, 0x6d6a4a, .65));
+scene.add(new T.AmbientLight(0xffffff, .22));
+const sun = new T.DirectionalLight(0xfff1dc, 1.15); sun.position.set(18,26,9); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:1,far:90}); sun.shadow.bias=-.0008; sun.shadow.normalBias=.03; scene.add(sun);
+for(const [x,y,z,i,d] of [[8,2.55,1.2,.7,7],[8,L+2.2,5.5,.5,8],[2,3.2,5,.35,6],[5.2,L+2.1,3.45,.25,3],[2,2.6,1.2,.3,4]]){ const p=new T.PointLight(0xffe2b8,i,d); p.position.set(x,y,z); scene.add(p); }
+
+// ---------- labels ----------
+function label(text,x,y,z){ const c=document.createElement('canvas'); c.width=512; c.height=128; const g=c.getContext('2d');
+  g.fillStyle='rgba(28,22,18,.78)'; g.beginPath(); g.moveTo(32,16); g.arcTo(496,16,496,112,24); g.arcTo(496,112,16,112,24); g.arcTo(16,112,16,16,24); g.arcTo(16,16,496,16,24); g.closePath(); g.fill();
+  g.fillStyle='#f3ede3'; g.font='700 54px Manrope, system-ui, sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,256,66);
+  const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; const s=new T.Sprite(new T.SpriteMaterial({map:t,transparent:true,depthTest:false})); s.scale.set(1.9,.475,1); s.position.set(x,y,z); labels.add(s); }
+label('Кухня',8,1.9,1.0); label('Гостевая',2,1.9,1.2); label('Гостиная',9.5,L+1.9,5.4); label('Спальня',2,L+1.9,5.2); label('Санузел',5.2,L+1.9,3.45);
+label('Веранда',6,1.9,-1.7); label('Крыльцо',4.3,L+1.6,9.4); label('Лестница',7.6,1.9,1.9); label('Бар',10.4,L+1.5,2.45); label('♪ Проигрыватель',6.6,L+1.5,7.6);
+
+// ---------- views & UI ----------
+const VIEWS = {
+  'Общий вид':[[22,15,22],[6,1.5,4]],
+  'Фасад':[[6,3.2,21],[6,2,6]],
+  'Веранда':[[13,2.1,-5.5],[3,1.3,-1.4]],
+  'Кухня':[[11.6,1.65,1.1],[5,1.4,1.25]],
+  'Гостиная':[[11.5,2.9,7.6],[6.5,2.3,3.6]],
+  'Спальня':[[3.6,2.8,7.6],[.6,2.5,4.6]],
+  'План':[[6,44,4.02],[6,0,4]],
+};
+let tw=null;
+function goTo(name){ leaveWalk(); const [p,t]=VIEWS[name]; tw={p0:camera.position.clone(),t0:controls.target.clone(),p1:new T.Vector3(...p),t1:new T.Vector3(...t),s:performance.now()};
+  document.querySelectorAll('#views button').forEach(b=>b.classList.toggle('on',b.textContent===name));
+  if(name==='План'){ roofCb.checked=false; roofG.visible=false; } }
+const viewsEl=document.getElementById('views');
+for(const n of Object.keys(VIEWS)){ const b=document.createElement('button'); b.textContent=n; b.onclick=()=>goTo(n); viewsEl.appendChild(b); }
+const roofCb=document.getElementById('roof'); roofCb.onchange=()=>roofG.visible=roofCb.checked;
+document.getElementById('furn').onchange=e=>furnG.visible=e.target.checked;
+document.getElementById('lbl').onchange=e=>labels.visible=e.target.checked;
+document.getElementById('veg').onchange=e=>vegG.visible=e.target.checked;
+camera.position.set(22,15,22); controls.target.set(6,1.5,4); labels.visible = false;
+controls.addEventListener('start',()=>{ tw=null; });
+const ui=document.getElementById('ui'), fold=document.getElementById('fold');
+fold.onclick=()=>{ ui.classList.toggle('folded'); fold.textContent=ui.classList.contains('folded')?'+':'−'; };
+if(innerWidth<640) fold.click();
+if(!('onpointerlockchange' in document) || matchMedia('(pointer:coarse)').matches) document.getElementById('walkBtn').title='Режим прогулки работает с мышью и клавиатурой';
+
+// ---------- прогулка от первого лица ----------
+const EYE = 1.62, walk = {on:false, locked:false, yaw:0, pitch:0, keys:{}, feetY:0, spaces:[]};
+let solids = [], walkables = [];
+function collectSolids(){ solids = []; walkables = [ground];
+  scene.traverse(o=>{ if(!o.isMesh || o===ground) return; let p=o; while(p){ if(p===vegG||p===labels) return; p=p.parent; }
+    if(o.material===GLASS) return; solids.push(o); walkables.push(o); }); }
+const ray = new T.Raycaster(), tmpV = new T.Vector3(), euler = new T.Euler(0,0,0,'YXZ');
+function groundAt(x, yFrom, z){ ray.set(tmpV.set(x, yFrom, z), new T.Vector3(0,-1,0)); ray.far = 30; const h = ray.intersectObjects(walkables, false); return h.length ? h[0].point.y : 0; }
+function blockedDir(px, pz, dx, dz){ const len = Math.hypot(dx,dz); if(len<1e-6) return false; const d = new T.Vector3(dx/len,0,dz/len);
+  for(const hy of [.35, .8, 1.25, 1.62]){ ray.set(tmpV.set(px - d.x*.25, walk.feetY+hy, pz - d.z*.25), d); ray.far = .7; if(ray.intersectObjects(solids, false).length) return true; } return false; }
+function startWalk(){ if(walk.on) return; if(!solids.length) collectSolids(); tw = null;
+  const sx = 9.6, sz = 13.2; walk.feetY = groundAt(sx, 3, sz); camera.position.set(sx, walk.feetY+EYE, sz);
+  walk.yaw = Math.atan2(-(6-sx), -(8-sz)); walk.pitch = 0; walk.keys = {}; walk.spaces = [];
+  walk.on = true; controls.enabled = false; walkHud.hidden = false; cross.hidden = false; applyLook(); walkBtn.textContent = '⏏ Выйти из прогулки'; }
+function applyLook(){ euler.set(walk.pitch, walk.yaw, 0); camera.quaternion.setFromEuler(euler); }
+function leaveWalk(){ if(!walk.on) return; if(document.pointerLockElement === canvas) document.exitPointerLock();
+  walk.on = false; walk.locked = false; controls.enabled = true; walkHud.hidden = true; cross.hidden = true; walkBtn.textContent = '🚶 Прогулка от первого лица';
+  camera.getWorldDirection(tmpV); controls.target.copy(camera.position).addScaledVector(tmpV, 3); controls.update(); }
+document.addEventListener('pointerlockchange', ()=>{ walk.locked = document.pointerLockElement === canvas; hudLock.hidden = walk.locked; });
+canvas.addEventListener('pointerdown', e=>{ if(walk.on && !walk.locked && e.button===0) canvas.requestPointerLock(); });
+document.addEventListener('mousemove', e=>{ if(!walk.on || !walk.locked) return; walk.yaw -= e.movementX*.0022; walk.pitch = Math.max(-1.4, Math.min(1.4, walk.pitch - e.movementY*.0022)); applyLook(); });
+addEventListener('keydown', e=>{ if(!walk.on) return; walk.keys[e.code] = true;
+  if(e.code==='Space' && !e.repeat){ const t=performance.now(); walk.spaces = walk.spaces.filter(x=>t-x<1500); walk.spaces.push(t); if(walk.spaces.length>=3){ leaveWalk(); return; } } if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault(); });
+addEventListener('keyup', e=>{ walk.keys[e.code] = false; });
+let lastT = performance.now();
+function stepWalk(now){ const dt = Math.min(.05, (now-lastT)/1000); lastT = now; if(!walk.on) return; const k = walk.keys;
+  let f = (k.KeyW||k.ArrowUp?1:0) - (k.KeyS||k.ArrowDown?1:0), r = (k.KeyD||k.ArrowRight?1:0) - (k.KeyA||k.ArrowLeft?1:0);
+  if(!f && !r) return; const sp = (k.ShiftLeft||k.ShiftRight ? 5.2 : 2.8) * dt, n = Math.hypot(f,r); f/=n; r/=n;
+  const sy = Math.sin(walk.yaw), cy = Math.cos(walk.yaw);
+  const dx = (-sy*f + cy*r) * sp, dz = (-cy*f - sy*r) * sp;
+  const p = camera.position;
+  if(!blockedDir(p.x, p.z, dx, 0)) p.x += dx;
+  if(!blockedDir(p.x, p.z, 0, dz)) p.z += dz;
+  const g = groundAt(p.x, walk.feetY + 1.0, p.z);
+  walk.feetY += (g - walk.feetY) * Math.min(1, dt*14); p.y = walk.feetY + EYE; }
+const walkHud = document.getElementById('walkHud'), cross = document.getElementById('cross'), hudLock = document.getElementById('hudLock'), walkBtn = document.getElementById('walkBtn');
+walkBtn.onclick = ()=> walk.on ? leaveWalk() : startWalk();
+
+// ---------- проигрыватель ----------
+const audio = new Audio('audio/pyl.mp3'); audio.loop = true; audio.preload = 'auto';
+const npEl = document.getElementById('np'), NP_HTML = npEl.innerHTML; let playing = false;
+function togglePlay(){ if(playing){ audio.pause(); playing=false; npEl.hidden=true; return; }
+  audio.play().then(()=>{ playing=true; npEl.hidden=false; }).catch(()=>{ npEl.hidden=false; npEl.textContent='Не удалось запустить звук — кликни ещё раз'; setTimeout(()=>{ npEl.hidden=true; npEl.innerHTML=NP_HTML; },2500); }); }
+const pRay = new T.Raycaster(), ptr = new T.Vector2();
+function hitPlayer(clientX, clientY){ if(walk.on) ptr.set(0,0); else ptr.set(clientX/innerWidth*2-1, -(clientY/innerHeight)*2+1); pRay.setFromCamera(ptr, camera); pRay.far = walk.on ? 4 : 1e3; return pRay.intersectObject(player, true).length>0; }
+let downAt = null;
+canvas.addEventListener('pointerdown', e=>{ if(e.button!==0) return; downAt=[e.clientX,e.clientY]; });
+canvas.addEventListener('pointerup', e=>{ if(e.button!==0||!downAt) return; const moved=Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1]); downAt=null; if(moved>6 && !walk.on) return; if(walk.on && !walk.locked) return; if(furnG.visible && hitPlayer(e.clientX,e.clientY)) togglePlay(); });
+canvas.addEventListener('pointermove', e=>{ if(walk.on) return; canvas.style.cursor = (furnG.visible && hitPlayer(e.clientX,e.clientY)) ? 'pointer' : ''; });
+const pPos = new T.Vector3(6.6, L+.7, 7.7);
+function tickPlayer(dt){ if(!playing) return; platter.rotation.y += dt*3.5; const d=camera.position.distanceTo(pPos); audio.volume = Math.max(.12, Math.min(1, 3.5/d)); }
+
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+let prevT = performance.now();
+function loop(now){ requestAnimationFrame(loop); now = now||performance.now(); tickPlayer(Math.min(.05,(now-prevT)/1000)); prevT = now; stepWalk(now);
+  if(tw){ const k=Math.min(1,(performance.now()-tw.s)/950); const e=k<.5?2*k*k:-1+(4-2*k)*k; camera.position.lerpVectors(tw.p0,tw.p1,e); controls.target.lerpVectors(tw.t0,tw.t1,e); if(k>=1) tw=null; }
+  if(!walk.on) controls.update(); renderer.render(scene,camera); }
+if(!matchMedia('(pointer:coarse)').matches) startWalk(); else document.querySelector('#views button').classList.add('on');
+loop();
+</script>
+</body>
+</html>
