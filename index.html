@@ -324,7 +324,7 @@ boxAt(.5,2.5,0,.8,-.95,-.35,METAL,F); cyl(.15,.05,solid(0x333),0.9,.83,-.65,F); 
 // ---------- 3D-модели (Kenney Furniture Kit, CC0) ----------
 const gltf = new T.GLTFLoader(), gcache = {};
 const BOHO = {wood:0xa66b3c, woodDark:0x6b4326, carpet:0xb9512f, carpetDarker:0x7a3b2a, carpetWhite:0xefe3cf, metal:0xb8a98e, metalDark:0x4a3f36, metalMedium:0x6b5c4d, metalLight:0xf2f0ea, plant:0x4a873a, lamp:0xffe4a8, glass:0xd7e6e6, _defaultMat:0xf4f3ef};
-function loadModel(name){ return gcache[name] || (gcache[name] = new Promise((res, rej)=> gltf.load('models/'+name+'.glb', g=>res(g.scene), undefined, rej))); }
+function loadModel(name){ return gcache[name] || (gcache[name] = new Promise((res, rej)=> gltf.load('models/'+name+'.gltf', g=>res(g.scene), undefined, rej))); }
 const pending = [];
 // place: имя модели, центр по x/z, уровень пола, поворот (рад), переопределение цветов по имени материала, масштаб
 function place(name, x, z, y=L, rot=0, colors={}, s=2){ const p = loadModel(name).then(src=>{
